@@ -93,7 +93,8 @@ bestehenden Dateien automatisch, ältere vorgemerkte Zeilen werden aufgefüllt.
   (Gesundheit, Familie) gehen im Klartext an die KI, sofern sie in der Vorschau nicht entfernt werden.
 - Entwurf und ausstehende Einträge liegen bis zum Upload unverschlüsselt im Browser-Speicher.
 
-Neue externe Verbindungen erfordern eine Anpassung der Content Security Policy in `index.html` –
+`blob:` ist für Skripte erlaubt, weil die ONNX-Laufzeit ihr Rechenwerk so lädt; blob-Adressen kann nur bereits
+laufender eigener Code erzeugen. Neue externe Verbindungen erfordern eine Anpassung der Content Security Policy in `index.html` –
 bewusst, damit jede neue Datenweitergabe sichtbar entschieden wird.
 
 ## Neue Funktion hinzufügen (Beispiele)

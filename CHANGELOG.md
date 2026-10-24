@@ -1,5 +1,8 @@
 # Changelog
 
+## 24 – 24.10.2026
+- Spracherkennung: Sicherheitsrichtlinie erlaubt das interne Laden des Rechenwerks über `blob:` (Fehler „no available backend found“)
+
 ## 23 – 24.10.2026
 - Hinweistexte nennen den deutschen Ordnernamen „Anwendungen“
 
