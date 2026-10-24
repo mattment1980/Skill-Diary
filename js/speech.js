@@ -58,6 +58,8 @@ function startWebSpeech({ local, onText, onInterim, onEnd }) {
 
 let transcriberPromise = null;
 let transcriberModel = '';
+/** Info zur letzten Umwandlung (für die Anzeige): backend 'WebGPU' | 'Prozessor', threads, Dauer. */
+export const whisperInfo = { backend: '', threads: 1 };
 
 /** Lädt das Whisper-Modell (einmalig, danach aus dem Browser-Cache). onProgress(0..100). */
 export function loadWhisper(onProgress = () => {}) {
@@ -66,19 +68,30 @@ export function loadWhisper(onProgress = () => {}) {
   transcriberModel = model;
   const files = {};
   transcriberPromise = (async () => {
-    const { pipeline } = await import(TRANSFORMERS);
+    const { pipeline, env } = await import(TRANSFORMERS);
+    // Mehrere Prozessorkerne nur mit Cross-Origin-Isolation möglich (wird über sw.js gesetzt).
+    const threads = self.crossOriginIsolated ? Math.max(1, Math.min(4, (navigator.hardwareConcurrency || 4) - 1)) : 1;
+    if (env?.backends?.onnx?.wasm) env.backends.onnx.wasm.numThreads = threads;
+    const progress_callback = p => {
+      if (p.status === 'progress' && p.total) {
+        files[p.file] = [p.loaded, p.total];
+        const [l, t] = Object.values(files).reduce(([a, b], [x, y]) => [a + x, b + y], [0, 0]);
+        onProgress(Math.round((l / t) * 100));
+      }
+    };
     const webgpu = !!navigator.gpu && !!(await navigator.gpu.requestAdapter().catch(() => null));
-    return pipeline('automatic-speech-recognition', model, {
-      device: webgpu ? 'webgpu' : 'wasm',
-      dtype: webgpu ? { encoder_model: 'fp32', decoder_model_merged: 'q4' } : 'q8',
-      progress_callback: p => {
-        if (p.status === 'progress' && p.total) {
-          files[p.file] = [p.loaded, p.total];
-          const [l, t] = Object.values(files).reduce(([a, b], [x, y]) => [a + x, b + y], [0, 0]);
-          onProgress(Math.round((l / t) * 100));
-        }
-      },
-    });
+    if (webgpu) {
+      try {
+        const t = await pipeline('automatic-speech-recognition', model, {
+          device: 'webgpu', dtype: { encoder_model: 'fp32', decoder_model_merged: 'q4' }, progress_callback,
+        });
+        Object.assign(whisperInfo, { backend: 'Grafikchip (WebGPU)', threads: 0 });
+        return t;
+      } catch (e) { console.warn('WebGPU nicht nutzbar, nutze Prozessor', e); }
+    }
+    const t = await pipeline('automatic-speech-recognition', model, { device: 'wasm', dtype: 'q8', progress_callback });
+    Object.assign(whisperInfo, { backend: 'Prozessor', threads });
+    return t;
   })();
   transcriberPromise.catch(() => { transcriberPromise = null; });
   return transcriberPromise;
@@ -93,7 +106,7 @@ async function toPcm16k(blob) {
   } finally { ctx.close(); }
 }
 
-async function startWhisper({ onText, onEnd, onStatus }) {
+async function startWhisper({ onText, onEnd, onStatus, onInfo }) {
   let stream;
   try { stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } }); }
   catch { throw new Error('Mikrofonzugriff wurde verweigert.'); }
@@ -115,7 +128,11 @@ async function startWhisper({ onText, onEnd, onStatus }) {
         const audio = await toPcm16k(new Blob(chunks, { type: rec.mimeType }));
         const transcriber = await loadWhisper(p => onStatus?.(`Sprachmodell wird geladen … ${p}%`));
         onStatus?.('Sprache wird umgewandelt …');
+        const t0 = performance.now();
         const out = await transcriber(audio, { language: 'german', task: 'transcribe', chunk_length_s: 30, stride_length_s: 5 });
+        const secs = Math.round((performance.now() - t0) / 1000);
+        const cores = whisperInfo.threads ? `, ${whisperInfo.threads} ${whisperInfo.threads === 1 ? 'Kern' : 'Kerne'}` : '';
+        onInfo?.(`Umgewandelt in ${secs} s (${Math.round(audio.length / 16000)} s Aufnahme, ${whisperInfo.backend}${cores})`);
         const text = (Array.isArray(out) ? out.map(o => o.text).join(' ') : out.text || '').trim();
         if (text) onText(text);
         onEnd?.();
@@ -143,10 +160,10 @@ export async function whisperCached() {
  * Startet die Spracheingabe mit dem besten verfügbaren Verfahren.
  * Rückgabe: { mode: 'local'|'cloud'|'whisper', stop(): Promise }
  */
-export async function startDictation({ onText, onInterim, onEnd, onStatus }) {
+export async function startDictation({ onText, onInterim, onEnd, onStatus, onInfo }) {
   const status = await localStatus();
   if (status === 'available') return startWebSpeech({ local: true, onText, onInterim, onEnd });
   if (SR && settings.allowCloudSpeech) return startWebSpeech({ local: false, onText, onInterim, onEnd });
-  if (navigator.mediaDevices?.getUserMedia && window.MediaRecorder) return startWhisper({ onText, onEnd, onStatus });
+  if (navigator.mediaDevices?.getUserMedia && window.MediaRecorder) return startWhisper({ onText, onEnd, onStatus, onInfo });
   throw new Error('Spracheingabe wird von diesem Browser nicht unterstützt.');
 }

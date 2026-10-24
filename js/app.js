@@ -8,7 +8,7 @@ import { extractFeedback, summarize } from './ai.js';
 import { startDictation, localStatus, loadWhisper, whisperCached, WHISPER_MODELS } from './speech.js';
 import { buildDocx } from './export.js';
 
-const APP_VERSION = '9';
+const APP_VERSION = '10';
 
 /* ---------- Zustand ---------- */
 const S = {
@@ -162,6 +162,7 @@ async function toggleDictation() {
       },
       onInterim: t => { const el = $('#interim'); if (el) el.textContent = t; },
       onStatus: speechStatus,
+      onInfo: msg => toast(msg),
       onEnd: msg => {
         if (S.dictation?.mode !== 'whisper') { S.dictation = null; render(); }
         const el = $('#interim'); if (el) el.textContent = '';
@@ -558,6 +559,8 @@ async function start() {
     await flushPending();
   } catch (e) { toast(e.message, 'error'); }
   render();
+  // Sprachmodell im Hintergrund in den Speicher holen, damit das erste Diktat nicht warten muss.
+  if (!settings.allowCloudSpeech && await whisperCached() && (await localStatus()) !== 'available') loadWhisper().catch(() => {});
 }
 
 start();
