@@ -1,5 +1,8 @@
 # Changelog
 
+## 23 – 24.10.2026
+- Hinweistexte nennen den deutschen Ordnernamen „Anwendungen“
+
 ## 22 – 24.10.2026
 - Umzug: bestehende Datenbank per Dateiauswahl übernehmen (lädt sie in den App-Ordner)
 

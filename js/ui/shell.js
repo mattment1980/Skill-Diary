@@ -48,11 +48,11 @@ async function importWorkbook(file) {
 function setupCard() {
   return h('div', { class: 'card setup' },
     h('h3', {}, 'Datenbank nicht gefunden'),
-    h('p', {}, 'Die App greift nur noch auf ihren eigenen Ordner zu: ', h('b', {}, 'OneDrive › Apps › Skill Diary'), '.'),
+    h('p', {}, 'Die App greift nur noch auf ihren eigenen Ordner zu: ', h('b', {}, 'OneDrive › Apps (deutsch: Anwendungen) › Skill Diary'), '.'),
     h('p', { class: 'hint' }, 'Am einfachsten: deine bisherige Skill-Diary.xlsx auswählen (z. B. in OneDrive), die App legt sie selbst in ihren Ordner.'),
     h('label', { class: 'btn primary block file-btn' }, 'Bestehende Datenbank auswählen',
       h('input', { type: 'file', accept: '.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', onchange: e => importWorkbook(e.target.files[0]) })),
-    h('p', { class: 'hint' }, 'Oder selbst verschieben: „Datenbank“ nach OneDrive › Apps › Skill Diary, dann „Erneut prüfen“.'),
+    h('p', { class: 'hint' }, 'Oder selbst verschieben: „Datenbank“ nach OneDrive › Anwendungen › Skill Diary, dann „Erneut prüfen“.'),
     h('div', { class: 'actions' },
       h('button', { class: 'btn ghost', onclick: () => withBusy('Öffne Ordner …', async () => { window.open(await appFolderUrl(), '_blank', 'noopener'); }) }, 'Ordner öffnen'),
       h('button', { class: 'btn ghost', onclick: () => withBusy('Prüfe …', () => syncConfig()) }, 'Erneut prüfen')),

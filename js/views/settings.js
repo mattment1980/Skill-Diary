@@ -39,7 +39,7 @@ export function settingsView() {
       field('Modell Zuordnung', 'modelExtract'),
       field('Modell Zusammenfassung', 'modelSummary')),
     h('div', { class: 'card' }, h('h3', {}, 'OneDrive'),
-      h('p', { class: 'hint' }, 'Die App sieht nur ihren eigenen Ordner „OneDrive › Apps › Skill Diary“. Die Ordner unten liegen darin.'),
+      h('p', { class: 'hint' }, 'Die App sieht nur ihren eigenen Ordner „OneDrive › Anwendungen (englisch: Apps) › Skill Diary“. Die Ordner unten liegen darin.'),
       field('Ordner Datenbank', 'folder'),
       field('Ordner Exporte', 'exportFolder')),
     h('div', { class: 'card' }, h('h3', {}, 'Spracheingabe'),

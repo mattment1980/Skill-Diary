@@ -48,7 +48,7 @@ neu gezeichnet wird über `render()` aus `ui/dom.js`, das `ui/shell.js` beim Sta
 
 | Was | Wo | Hinweis |
 |---|---|---|
-| Feedback, Spieler, Kompetenzen, Positionen | OneDrive `Apps/Skill Diary/Datenbank/Skill-Diary.xlsx` | einzige dauerhafte Ablage |
+| Feedback, Spieler, Kompetenzen, Positionen | OneDrive `Apps/Skill Diary/Datenbank/Skill-Diary.xlsx` (deutsch: `Anwendungen/…`) | einzige dauerhafte Ablage |
 | Exporte (PowerPoint) | OneDrive `Apps/Skill Diary/Exporte/` | |
 | Einstellungen, KI-Schlüssel | `localStorage` `sd.settings` | nur auf dem Handy, beim Abmelden gelöscht |
 | Kopie der Konfiguration | `localStorage` `sd.cfg` | für Anonymisierung ohne Netz |

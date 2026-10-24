@@ -2,7 +2,7 @@
 
 Web-App (Android/Chrome, als App installierbar) zum Erfassen von Spieler-Feedback im Jugendfußball:
 diktieren oder tippen → KI ordnet Spieler, Kompetenzbereich, Skill, Bewertung und Position zu → prüfen →
-Ablage als Zeilen in einer Excel-Datei im eigenen OneDrive (App-Ordner `Apps/Skill Diary`). Dazu Auswertung je Spieler (Verlauf, Niveau je Bereich/Skill) und ein
+Ablage als Zeilen in einer Excel-Datei im eigenen OneDrive (App-Ordner `Apps/Skill Diary`, im deutschen OneDrive `Anwendungen/Skill Diary`). Dazu Auswertung je Spieler (Verlauf, Niveau je Bereich/Skill) und ein
 Entwicklungsgespräch als PowerPoint (KI-Zusammenfassung + Grafiken, im Vereinslayout).
 
 App: https://mattment1980.github.io/Skill-Diary/
