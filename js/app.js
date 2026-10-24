@@ -5,10 +5,10 @@ import { initAuth, login, logout, accountName } from './auth.js';
 import * as od from './onedrive.js';
 import { anonymize, deanonymize } from './anon.js';
 import { extractFeedback, summarize } from './ai.js';
-import { startDictation, localStatus, loadWhisper, WHISPER_MODELS } from './speech.js';
+import { startDictation, localStatus, loadWhisper, whisperCached, WHISPER_MODELS } from './speech.js';
 import { buildDocx } from './export.js';
 
-const APP_VERSION = '5';
+const APP_VERSION = '6';
 
 /* ---------- Zustand ---------- */
 const S = {
@@ -426,8 +426,9 @@ function settingsView() {
     h('div', { class: 'card' }, h('h3', {}, 'Spracheingabe'),
       h('p', { class: 'hint' }, 'Der Aufnahme-Button nutzt die Erkennung direkt auf dem Gerät. Ist die Chrome-eigene nicht verfügbar, wandelt ein Sprachmodell (Whisper) die Aufnahme auf dem Handy in Text um – ohne Upload.'),
       h('label', { class: 'field' }, 'Sprachmodell',
-        h('select', { onchange: e => saveSettings({ whisperModel: e.target.value }) },
+        h('select', { onchange: e => { saveSettings({ whisperModel: e.target.value }); showModelStatus(); } },
           ...Object.entries(WHISPER_MODELS).map(([v, l]) => h('option', { value: v, selected: (settings.whisperModel || Object.keys(WHISPER_MODELS)[0]) === v }, l)))),
+      h('p', { id: 'model-status', class: 'model-status' }, 'Sprachmodell: wird geprüft …'),
       h('button', { class: 'btn ghost', onclick: () => withBusy('Sprachmodell wird geladen …', async () => { await loadWhisper(p => speechStatus(`Sprachmodell wird geladen … ${p}%`)); toast('Sprachmodell bereit ✓', 'ok'); }) }, 'Sprachmodell jetzt laden (WLAN)'),
       h('p', { id: 'speech-status', class: 'hint' }, ''),
       h('button', { class: 'btn ghost', onclick: async () => { $('#speech-status').textContent = 'Prüfe …'; const st = await localStatus(); $('#speech-status').textContent = ({ available: 'Chrome-Erkennung auf dem Gerät verfügbar ✓ (Live-Text)', downloading: 'Chrome lädt das Sprachpaket …', unavailable: 'Chrome-Erkennung lokal nicht verfügbar – Whisper wird genutzt', unsupported: 'Keine Chrome-Erkennung – Whisper wird genutzt', unknown: 'Chrome-Erkennung lokal nicht verfügbar – Whisper wird genutzt' })[st] || st; } }, 'Chrome-Erkennung prüfen'),
@@ -441,6 +442,13 @@ function settingsView() {
     h('div', { class: 'actions sticky' },
       h('button', { class: 'btn ghost', onclick: () => withBusy('Lade aus OneDrive …', syncConfig) }, 'Neu laden'),
       h('button', { class: 'btn primary', onclick: saveConfig }, 'Speichern')));
+}
+
+/** Zeigt dauerhaft an, ob das Sprachmodell auf dem Handy liegt. */
+async function showModelStatus() {
+  const ok = await whisperCached();
+  const el = $('#model-status');
+  if (el) { el.textContent = ok ? 'Sprachmodell: auf dem Handy gespeichert ✓' : 'Sprachmodell: noch nicht geladen'; el.classList.toggle('ok', ok); }
 }
 
 async function saveConfig() {
@@ -473,6 +481,7 @@ function render() {
     h('nav', { class: 'tabs' }, tab('capture', 'Erfassen', '✎'), tab('stats', 'Auswertung', '▤'), tab('settings', 'Einstellungen', '⚙')),
   ].filter(Boolean));
   if (S.tab !== 'capture') window.scrollTo(0, scroll);
+  if (S.tab === 'settings') showModelStatus();
 }
 
 function loginView() {

@@ -127,6 +127,16 @@ async function startWhisper({ onText, onEnd, onStatus }) {
   };
 }
 
+/** Prüft, ob das gewählte Whisper-Modell schon im Browser-Speicher liegt (transformers.js-Cache). */
+export async function whisperCached() {
+  const model = settings.whisperModel || Object.keys(WHISPER_MODELS)[0];
+  try {
+    const keys = await (await caches.open('transformers-cache')).keys();
+    const files = keys.map(k => k.url).filter(u => u.includes(model) && u.endsWith('.onnx'));
+    return files.length >= 2; // Encoder + Decoder
+  } catch { return false; }
+}
+
 /* ---------- Einstieg ---------- */
 
 /**
