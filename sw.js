@@ -1,6 +1,6 @@
 // Service Worker: speichert nur die App-Dateien zwischen (keine Spieler- oder Feedbackdaten).
 // Beim Aufräumen nur eigene Caches (sd-*) löschen – das Sprachmodell liegt in "transformers-cache" und bleibt.
-const VERSION = 'sd-v16';
+const VERSION = 'sd-v17';
 const SHELL = ['./', 'index.html', 'css/app.css', 'js/app.js', 'js/config.js', 'js/auth.js', 'js/onedrive.js',
   'js/anon.js', 'js/ai.js', 'js/speech.js', 'js/stats.js', 'js/report.js', 'lib/msal-browser.min.js', 'manifest.webmanifest',
   'assets/logo.png', 'assets/bg.webp', 'assets/leo.webp', 'assets/leo-head.webp', 'assets/icon-192.png'];

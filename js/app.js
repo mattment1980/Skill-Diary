@@ -8,7 +8,7 @@ import { extractFeedback, summarize } from './ai.js';
 import { startDictation, localStatus, loadWhisper, whisperCached, WHISPER_MODELS, WHISPER_DEVICES } from './speech.js';
 import { buildPptx } from './report.js';
 
-const APP_VERSION = '16';
+const APP_VERSION = '17';
 
 /* ---------- Zustand ---------- */
 const S = {
