@@ -1,5 +1,8 @@
 # Changelog
 
+## 25 – 24.10.2026
+- Abmelden entfernt zusätzlich Sprachmodell, Offline-Dateien, Service Worker und Anmelde-Zwischenspeicher dieser App (Vorbereitung Umzug auf eigene Domain)
+
 ## 24 – 24.10.2026
 - Spracherkennung: Sicherheitsrichtlinie erlaubt das interne Laden des Rechenwerks über `blob:` (Fehler „no available backend found“)
 

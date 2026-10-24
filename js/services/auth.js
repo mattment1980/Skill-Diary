@@ -26,15 +26,34 @@ export function login() {
   return app.loginRedirect({ scopes: CONFIG.scopes, prompt: 'select_account' });
 }
 
-/** Alle lokal gespeicherten App-Daten löschen (Einstellungen inkl. KI-Schlüssel, Entwurf, Vormerkungen, Spielerliste).
- *  Das Sprachmodell bleibt (enthält keine Personendaten). */
-export function clearLocalData() {
-  try { Object.keys(localStorage).filter(k => k.startsWith('sd.')).forEach(k => localStorage.removeItem(k)); } catch { /* */ }
+/**
+ * Alle Daten dieser App im Browser löschen: Einstellungen inkl. KI-Schlüssel, Entwurf, Vormerkungen,
+ * Spielerliste, Anmelde-Zwischenspeicher dieser App, Offline-Dateien und Sprachmodell.
+ * Andere Apps unter derselben Adresse (z. B. Dokumentenmanager) bleiben unberührt: gelöscht werden nur
+ * Schlüssel mit Präfix "sd." bzw. mit der Client-ID dieser App und die eigenen Caches.
+ */
+export async function clearLocalData() {
+  try {
+    Object.keys(localStorage)
+      .filter(k => k.startsWith('sd.') || k.includes(CONFIG.clientId))
+      .forEach(k => localStorage.removeItem(k));
+  } catch { /* */ }
+  try {
+    const keys = await caches.keys();
+    await Promise.all(keys.filter(k => k.startsWith('sd-') || k === 'transformers-cache').map(k => caches.delete(k)));
+  } catch { /* */ }
+  try {
+    const regs = await navigator.serviceWorker?.getRegistrations() || [];
+    // nur den Service Worker dieser App (Bereich endet auf ihren Pfad), nicht den des Dokumentenmanagers
+    const scope = new URL('./', location.href).href;
+    await Promise.all(regs.filter(r => r.scope === scope).map(r => r.unregister()));
+  } catch { /* */ }
 }
 
-export function logout() {
-  clearLocalData();
-  return app.logoutRedirect({ account: app.getActiveAccount() });
+export async function logout() {
+  const account = app.getActiveAccount();
+  await clearLocalData();
+  return app.logoutRedirect({ account });
 }
 
 export function accountName() {

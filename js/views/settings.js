@@ -24,7 +24,7 @@ export function settingsView() {
   return h('section', { class: 'view settings' },
     h('div', { class: 'card' }, h('h3', {}, 'Konto'),
       h('p', {}, accountName()),
-      h('p', { class: 'hint' }, 'Beim Abmelden werden alle Daten der App auf diesem Handy gelöscht (inkl. KI-Schlüssel). Die Daten im OneDrive bleiben.'),
+      h('p', { class: 'hint' }, 'Beim Abmelden werden alle Daten der App auf diesem Handy gelöscht (inkl. KI-Schlüssel und Sprachmodell). Die Daten im OneDrive bleiben.'),
       h('button', { class: 'btn ghost', onclick: () => {
         const warn = S.pending.length ? `\n\nAchtung: ${S.pending.length} Einträge sind noch nicht im OneDrive und gehen verloren.` : '';
         if (confirm(`Abmelden und Daten auf diesem Handy löschen?${warn}`)) logout();
