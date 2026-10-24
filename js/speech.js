@@ -106,7 +106,13 @@ async function toPcm16k(blob) {
   } finally { ctx.close(); }
 }
 
+/** Hält den Bildschirm an (sonst bricht der Bildschirmschoner die Umwandlung optisch ab). */
+async function keepAwake() {
+  try { return await navigator.wakeLock?.request('screen'); } catch { return null; }
+}
+
 async function startWhisper({ onText, onEnd, onStatus, onInfo }) {
+  const lock = await keepAwake();
   let stream;
   try { stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } }); }
   catch { throw new Error('Mikrofonzugriff wurde verweigert.'); }
@@ -132,14 +138,16 @@ async function startWhisper({ onText, onEnd, onStatus, onInfo }) {
         const out = await transcriber(audio, { language: 'german', task: 'transcribe', chunk_length_s: 30, stride_length_s: 5 });
         const secs = Math.round((performance.now() - t0) / 1000);
         const cores = whisperInfo.threads ? `, ${whisperInfo.threads} ${whisperInfo.threads === 1 ? 'Kern' : 'Kerne'}` : '';
-        onInfo?.(`Umgewandelt in ${secs} s (${Math.round(audio.length / 16000)} s Aufnahme, ${whisperInfo.backend}${cores})`);
+        const info = `Umgewandelt in ${secs} s (${Math.round(audio.length / 16000)} s Aufnahme, ${whisperInfo.backend}${cores}, ${(settings.whisperModel || '').includes('base') ? 'Schnell' : 'Genau'})`;
+        try { localStorage.setItem('sd.lastSpeech', info); } catch { /* */ }
+        onInfo?.(info);
         const text = (Array.isArray(out) ? out.map(o => o.text).join(' ') : out.text || '').trim();
         if (text) onText(text);
         onEnd?.();
       } catch (e) {
         console.error(e);
         onEnd?.(`Spracherkennung fehlgeschlagen: ${e.message}`);
-      }
+      } finally { lock?.release().catch(() => {}); }
     },
   };
 }

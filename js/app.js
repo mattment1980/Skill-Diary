@@ -8,7 +8,7 @@ import { extractFeedback, summarize } from './ai.js';
 import { startDictation, localStatus, loadWhisper, whisperCached, WHISPER_MODELS } from './speech.js';
 import { buildDocx } from './export.js';
 
-const APP_VERSION = '10';
+const APP_VERSION = '11';
 
 /* ---------- Zustand ---------- */
 const S = {
@@ -479,6 +479,8 @@ function settingsView() {
         h('select', { onchange: e => { saveSettings({ whisperModel: e.target.value }); showModelStatus(); } },
           ...Object.entries(WHISPER_MODELS).map(([v, l]) => h('option', { value: v, selected: (settings.whisperModel || Object.keys(WHISPER_MODELS)[0]) === v }, l)))),
       h('p', { id: 'model-status', class: 'model-status' }, 'Sprachmodell: wird geprüft …'),
+      h('p', { class: 'hint' }, `Letzte Umwandlung: ${load('sd.lastSpeech', null) ?? (() => { try { return localStorage.getItem('sd.lastSpeech') || '–'; } catch { return '–'; } })()}`),
+      h('p', { class: 'hint' }, `Technik: WebGPU ${navigator.gpu ? 'vorhanden' : 'nicht vorhanden'} · Mehrkern ${self.crossOriginIsolated ? 'aktiv' : 'nicht aktiv'} · ${navigator.hardwareConcurrency || '?'} Kerne`),
       h('button', { class: 'btn ghost', onclick: () => withBusy('Sprachmodell wird geladen …', async () => { await loadWhisper(p => speechStatus(`Sprachmodell wird geladen … ${p}%`)); toast('Sprachmodell bereit ✓', 'ok'); }) }, 'Sprachmodell jetzt laden (WLAN)'),
       h('p', { id: 'speech-status', class: 'hint' }, ''),
       h('button', { class: 'btn ghost', onclick: async () => { $('#speech-status').textContent = 'Prüfe …'; const st = await localStatus(); $('#speech-status').textContent = ({ available: 'Chrome-Erkennung auf dem Gerät verfügbar ✓ (Live-Text)', downloading: 'Chrome lädt das Sprachpaket …', unavailable: 'Chrome-Erkennung lokal nicht verfügbar – Whisper wird genutzt', unsupported: 'Keine Chrome-Erkennung – Whisper wird genutzt', unknown: 'Chrome-Erkennung lokal nicht verfügbar – Whisper wird genutzt' })[st] || st; } }, 'Chrome-Erkennung prüfen'),
