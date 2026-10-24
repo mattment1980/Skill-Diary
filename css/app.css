@@ -148,3 +148,13 @@ label.check { display: flex; gap: 10px; align-items: center; color: var(--muted)
 .fb-head { display: flex; align-items: center; gap: 6px; }
 .fb-head .fb-meta { flex: 1; }
 .mini { background: transparent; border: 1px solid var(--line); color: var(--muted); border-radius: 10px; width: 36px; height: 32px; flex: none; }
+
+.timeline svg { width: 100%; height: auto; display: block; }
+.tl-n { font-size: 9px; font-weight: 600; fill: #0d110f; }
+.tl-t { font-size: 9px; fill: var(--muted); }
+.tl-l { font-size: 10px; fill: var(--muted); }
+.tl-axis { stroke: var(--line); }
+.legend { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; font-size: .85rem; }
+.lg::before { content: ''; display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; background: var(--neu); }
+.lg.r-positiv::before { background: var(--pos); } .lg.r-kritisch::before { background: var(--krit); }
+.legend .hint { margin-left: auto; }

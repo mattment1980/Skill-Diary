@@ -8,7 +8,7 @@ import { extractFeedback, summarize } from './ai.js';
 import { startDictation, localStatus, loadWhisper, whisperCached, WHISPER_MODELS, WHISPER_DEVICES } from './speech.js';
 import { buildDocx } from './export.js';
 
-const APP_VERSION = '12';
+const APP_VERSION = '13';
 
 /* ---------- Zustand ---------- */
 const S = {
@@ -322,6 +322,7 @@ function statsView() {
         return h('button', { class: `area-row ${st.area === a ? 'on' : ''}`, onclick: () => { st.area = st.area === a ? '' : a; render(); } },
           h('span', { class: 'area-name' }, a, h('small', {}, ` ${rows.length}`)), bar(rows));
       })),
+    timeline(list, st.area),
     S.summary ? summaryEditor() : h('button', { class: 'btn primary block', disabled: !all.length, onclick: () => makeSummary(all) }, 'Zusammenfassung erstellen'),
     h('h3', { class: 'list-title' }, st.area ? `${st.area} (${list.length})` : `Alle Einträge (${list.length})`),
     ...list.map(f => (S.editId === f.ID ? editCard(f) : h('div', { class: `card fb r-${String(f.Bewertung).toLowerCase()}` },
@@ -375,6 +376,65 @@ async function removeFeedback(f) {
     S.summary = null;
     toast('Gelöscht', 'ok');
   });
+}
+
+/** Zeitleiste: gestapelte Säulen je Monat (bei bis zu ~10 Wochen je Woche) mit Positiv/Neutral/Kritisch. */
+function timeline(rows, area) {
+  const dated = rows.filter(f => /^\d{4}-\d{2}-\d{2}$/.test(String(f.Datum)));
+  const undated = rows.length - dated.length;
+  const card = (...kids) => h('div', { class: 'card' }, h('h3', {}, `Verlauf${area ? ` · ${area}` : ''}`), ...kids);
+  if (!dated.length) return card(h('p', { class: 'hint' }, 'Noch keine datierten Einträge im Zeitraum.'));
+
+  const days = iso => Date.UTC(+iso.slice(0, 4), +iso.slice(5, 7) - 1, +iso.slice(8, 10)) / 86400000;
+  const fromD = days(S.stats.from), toD = days(S.stats.to);
+  const weekly = toD - fromD <= 70;
+  const MONTHS = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
+  // Buckets lückenlos über den gewählten Zeitraum anlegen
+  const buckets = [];
+  if (weekly) {
+    const monday = d => d - ((new Date(d * 86400000).getUTCDay() + 6) % 7);
+    for (let d = monday(fromD); d <= toD; d += 7) {
+      const dt = new Date(d * 86400000);
+      buckets.push({ start: d, end: d + 6, label: `${dt.getUTCDate()}.${dt.getUTCMonth() + 1}.` });
+    }
+  } else {
+    let y = +S.stats.from.slice(0, 4), m = +S.stats.from.slice(5, 7) - 1;
+    while (Date.UTC(y, m, 1) / 86400000 <= toD) {
+      buckets.push({ start: Date.UTC(y, m, 1) / 86400000, end: Date.UTC(y, m + 1, 1) / 86400000 - 1, label: MONTHS[m] });
+      if (++m > 11) { m = 0; y++; }
+    }
+  }
+  for (const b of buckets) {
+    const inB = dated.filter(f => { const d = days(f.Datum); return d >= b.start && d <= b.end; });
+    b.counts = CONFIG.ratings.map(r => inB.filter(f => f.Bewertung === r).length);
+    b.total = inB.length;
+  }
+  const max = Math.max(1, ...buckets.map(b => b.total));
+  const W = 340, H = 150, top = 14, bottom = 22, left = 4;
+  const slot = (W - left) / buckets.length, bw = Math.min(34, slot * 0.7);
+  const scale = (H - top - bottom) / max;
+  const colors = ['var(--pos)', 'var(--neu)', 'var(--krit)'];
+  let svg = '';
+  buckets.forEach((b, i) => {
+    const x = left + i * slot + (slot - bw) / 2;
+    let y = H - bottom;
+    b.counts.forEach((n, k) => {
+      if (!n) return;
+      const hgt = n * scale;
+      y -= hgt;
+      svg += `<rect x="${x}" y="${y}" width="${bw}" height="${hgt}" rx="2" fill="${colors[k]}"><title>${b.label}: ${n} ${CONFIG.ratings[k]}</title></rect>`;
+      if (hgt >= 12) svg += `<text x="${x + bw / 2}" y="${y + hgt / 2 + 4}" text-anchor="middle" class="tl-n">${n}</text>`;
+    });
+    if (b.total) svg += `<text x="${x + bw / 2}" y="${y - 3}" text-anchor="middle" class="tl-t">${b.total}</text>`;
+    if (!weekly || buckets.length <= 8 || i % 2 === 0) svg += `<text x="${x + bw / 2}" y="${H - 6}" text-anchor="middle" class="tl-l">${b.label}</text>`;
+  });
+  svg += `<line x1="0" x2="${W}" y1="${H - bottom}" y2="${H - bottom}" class="tl-axis"/>`;
+  const chart = h('div', { class: 'timeline' });
+  chart.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Verlauf der Bewertungen">${svg}</svg>`;
+  return card(chart,
+    h('div', { class: 'legend' }, ...CONFIG.ratings.map(r => h('span', { class: `lg r-${r.toLowerCase()}` }, r)),
+      h('span', { class: 'hint' }, weekly ? 'je Woche' : 'je Monat')),
+    undated ? h('p', { class: 'hint' }, `${undated} Einträge ohne Datum sind nicht enthalten.`) : null);
 }
 
 function overview() {
