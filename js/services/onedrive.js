@@ -6,9 +6,21 @@ import { getToken } from './auth.js';
 
 const G = 'https://graph.microsoft.com/v1.0';
 
-/** OneDrive-Pfad -> Graph-Adressierung über den Pfad. */
+/** Pfad relativ zum App-Ordner (OneDrive/Apps/Skill Diary) -> Graph-Adressierung.
+ *  Mit der Berechtigung Files.ReadWrite.AppFolder ist nur dieser Ordner erreichbar. */
 function byPath(path) {
-  return '/me/drive/root:/' + path.split('/').filter(Boolean).map(encodeURIComponent).join('/') + ':';
+  return '/me/drive/special/approot:/' + path.split('/').filter(Boolean).map(encodeURIComponent).join('/') + ':';
+}
+
+/** Fehler, wenn im App-Ordner noch keine Datenbank liegt (z. B. vor dem Umzug). */
+export class NoWorkbookError extends Error {
+  constructor() { super('Keine Datenbank im App-Ordner gefunden.'); this.name = 'NoWorkbookError'; }
+}
+
+/** Link zum App-Ordner im OneDrive (legt ihn bei Bedarf an). */
+export async function appFolderUrl() {
+  const r = await graph('/me/drive/special/approot?$select=webUrl');
+  return r.webUrl;
 }
 
 async function graph(url, { method = 'GET', body, headers = {}, allow404 = false, raw = false } = {}) {
@@ -32,11 +44,15 @@ async function graph(url, { method = 'GET', body, headers = {}, allow404 = false
 let workbookId = null;
 const wb = () => `/me/drive/items/${workbookId}/workbook`;
 
-/** Stellt sicher, dass die Datenbank existiert – legt sie bei Bedarf aus der leeren Vorlage an. */
-export async function ensureWorkbook() {
+/**
+ * Sucht die Datenbank im App-Ordner. Fehlt sie, wird nur mit create=true eine leere aus der Vorlage
+ * angelegt – sonst NoWorkbookError, damit nie versehentlich eine leere Datenbank neben der echten entsteht.
+ */
+export async function ensureWorkbook({ create = false } = {}) {
   const path = `${settings.folder}/${CONFIG.workbookName}`;
   let item = await graph(byPath(path), { allow404: true });
   if (!item) {
+    if (!create) throw new NoWorkbookError();
     const tpl = await (await fetch(CONFIG.templateUrl)).arrayBuffer();
     item = await graph(byPath(path) + '/content', {
       method: 'PUT', body: tpl,

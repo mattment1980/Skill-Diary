@@ -2,6 +2,7 @@
 // Aufbau und Konventionen: docs/ARCHITEKTUR.md
 import { settings } from './core/config.js';
 import { syncConfig, flushPending } from './core/data.js';
+import { S } from './core/state.js';
 import { initAuth } from './services/auth.js';
 import { whisperCached, localStatus, loadWhisper } from './services/speech.js';
 import { toast, render } from './ui/dom.js';
@@ -20,7 +21,7 @@ async function start() {
   render();
   try {
     await syncConfig();
-    await flushPending();
+    if (!S.noDb) await flushPending();
   } catch (e) { toast(e.message, 'error'); }
   render();
   // Sprachmodell im Hintergrund in den Speicher holen, damit das erste Diktat nicht warten muss.

@@ -2,14 +2,15 @@
 
 Web-App (Android/Chrome, als App installierbar) zum Erfassen von Spieler-Feedback im Jugendfußball:
 diktieren oder tippen → KI ordnet Spieler, Kompetenzbereich, Skill, Bewertung und Position zu → prüfen →
-Ablage als Zeilen in einer Excel-Datei im eigenen OneDrive. Dazu Auswertung je Spieler (Verlauf, Niveau je Bereich/Skill) und ein
+Ablage als Zeilen in einer Excel-Datei im eigenen OneDrive (App-Ordner `Apps/Skill Diary`). Dazu Auswertung je Spieler (Verlauf, Niveau je Bereich/Skill) und ein
 Entwicklungsgespräch als PowerPoint (KI-Zusammenfassung + Grafiken, im Vereinslayout).
 
 App: https://mattment1980.github.io/Skill-Diary/
 
 ## Datenschutz
 
-- Spieler- und Feedbackdaten liegen **nur im OneDrive** (`Skill-Diary.xlsx`). Im Repo stehen keine Personendaten.
+- Spieler- und Feedbackdaten liegen **nur im OneDrive** (`Apps/Skill Diary/Datenbank/Skill-Diary.xlsx`). Im Repo stehen keine Personendaten.
+- Die App hat nur Zugriff auf ihren **eigenen App-Ordner** (`Files.ReadWrite.AppFolder`), nicht auf das übrige OneDrive.
 - Vor jedem KI-Aufruf werden Namen **auf dem Handy** durch zufällige Codes ersetzt; der anonymisierte Text wird
   vor dem Senden angezeigt und kann bearbeitet werden.
 - Spracheingabe läuft **auf dem Gerät** (Chrome lokal oder Whisper im Browser). Cloud-Erkennung nur nach Einstellung.
@@ -48,7 +49,7 @@ tests/            npm test
 
 1. GitHub Pages: Settings → Pages → Branch `main`, Ordner `/ (root)`.
 2. Azure App-Registrierung (SPA), Redirect-URI `https://mattment1980.github.io/Skill-Diary/`,
-   Berechtigungen `Files.ReadWrite`, `offline_access`. Client-ID steht in `js/core/config.js`.
+   Berechtigungen `Files.ReadWrite.AppFolder`, `offline_access` (kein `Files.ReadWrite`). Client-ID steht in `js/core/config.js`.
 3. In der App unter Einstellungen den Anthropic-Schlüssel eintragen.
 
 Nach Änderungen `APP_VERSION` in `js/version.js` erhöhen, damit Handys die neue Version laden (siehe Release in der Architektur-Doku).

@@ -4,7 +4,8 @@
 export const CONFIG = {
   clientId: '08e840d7-6c4b-440b-b55e-85b168c02713',
   authority: 'https://login.microsoftonline.com/consumers',
-  scopes: ['Files.ReadWrite'],
+  // Nur der App-eigene Ordner OneDrive/Apps/Skill Diary – kein Zugriff auf das übrige OneDrive.
+  scopes: ['Files.ReadWrite.AppFolder'],
   workbookName: 'Skill-Diary.xlsx',
   templateUrl: 'template/Skill-Diary-Vorlage.xlsx',
   feedbackTable: 'Feedback',
@@ -19,8 +20,8 @@ const DEFAULTS = {
   apiKey: '',
   modelExtract: 'claude-haiku-5-5',
   modelSummary: 'claude-sonnet-5-5',
-  folder: '12_Fussball Kinder/Saison 26-27 (2017)/04_Skill Diary - Claude/Datenbank',
-  exportFolder: '12_Fussball Kinder/Saison 26-27 (2017)/04_Skill Diary - Claude/Exporte',
+  folder: 'Datenbank',        // relativ zum App-Ordner OneDrive/Apps/Skill Diary
+  exportFolder: 'Exporte',
   allowCloudSpeech: false,
   previewBeforeSend: true,   // anonymisierten Text vor dem Senden an die KI anzeigen
   downloadExports: false,    // Exporte zusätzlich in die Downloads des Handys legen
@@ -37,6 +38,9 @@ export function save(key, value) {
 }
 
 export const settings = { ...DEFAULTS, ...load(KEY, {}) };
+// Umstellung auf App-Ordner (Version 20): alte, absolute Pfade auf die neuen Standardordner zurücksetzen.
+if (settings.folder.includes('/')) settings.folder = DEFAULTS.folder;
+if (settings.exportFolder.includes('/')) settings.exportFolder = DEFAULTS.exportFolder;
 export function saveSettings(patch) { Object.assign(settings, patch); save(KEY, settings); }
 
 /** Heutiges Datum als YYYY-MM-DD in lokaler Zeit. */

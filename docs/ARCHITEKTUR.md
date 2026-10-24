@@ -48,8 +48,8 @@ neu gezeichnet wird über `render()` aus `ui/dom.js`, das `ui/shell.js` beim Sta
 
 | Was | Wo | Hinweis |
 |---|---|---|
-| Feedback, Spieler, Kompetenzen, Positionen | OneDrive `…/Datenbank/Skill-Diary.xlsx` | einzige dauerhafte Ablage |
-| Exporte (PowerPoint) | OneDrive `…/Exporte/` | |
+| Feedback, Spieler, Kompetenzen, Positionen | OneDrive `Apps/Skill Diary/Datenbank/Skill-Diary.xlsx` | einzige dauerhafte Ablage |
+| Exporte (PowerPoint) | OneDrive `Apps/Skill Diary/Exporte/` | |
 | Einstellungen, KI-Schlüssel | `localStorage` `sd.settings` | nur auf dem Handy, beim Abmelden gelöscht |
 | Kopie der Konfiguration | `localStorage` `sd.cfg` | für Anonymisierung ohne Netz |
 | Entwurf, ausstehende Einträge | `localStorage` `sd.draft`, `sd.pending` | werden nach Upload geleert |
@@ -80,13 +80,15 @@ bestehenden Dateien automatisch, ältere vorgemerkte Zeilen werden aufgefüllt.
 | Content Security Policy: Code nur aus dem Repo; Verbindungen nur zu Microsoft, Anthropic, Hugging Face | `index.html` |
 | Inhalte aus dem Excel werden vor `innerHTML` maskiert (`esc`) | `ui/charts.js` |
 | Abmelden löscht alle lokalen App-Daten (`sd.*`) inkl. KI-Schlüssel | `services/auth.js` `clearLocalData` |
+| Berechtigung nur für den App-Ordner (`Files.ReadWrite.AppFolder`); Pfade relativ zu `special/approot` | `core/config.js`, `services/onedrive.js` |
+| Fehlt die Datenbank, wird nie automatisch eine leere angelegt (Hinweis mit Umzugsanleitung) | `services/onedrive.js` `NoWorkbookError`, `ui/shell.js` |
 | Exporte nur ins OneDrive; Download aufs Handy nur auf Wunsch | `views/stats.js`, Einstellungen |
 | Spracheingabe lokal (Chrome lokal bzw. Whisper im Browser); Cloud nur nach ausdrücklicher Einstellung | `services/speech.js` |
 
 **Bekannte Restrisiken**
 - *Gleiche Herkunft wie der Dokumentenmanager* (`mattment1980.github.io`): beide Apps teilen sich den
   Browser-Speicher (Anmeldungen, Schlüssel). Abhilfe: eigene Adresse für Skill Diary.
-- *Berechtigung `Files.ReadWrite`* gilt für das gesamte OneDrive. Engere Alternative wäre ein App-Ordner.
+- *Video-Verknüpfungen* (geplant) funktionieren nur für Videos, die im App-Ordner liegen.
 - *Pseudonymisierung ≠ Anonymisierung*: nicht hinterlegte Namen, falsch erkannte Namen und Inhalte
   (Gesundheit, Familie) gehen im Klartext an die KI, sofern sie in der Vorschau nicht entfernt werden.
 - Entwurf und ausstehende Einträge liegen bis zum Upload unverschlüsselt im Browser-Speicher.

@@ -1,5 +1,10 @@
 # Changelog
 
+## 20 – 24.10.2026
+- Zugriff nur noch auf den App-Ordner `OneDrive/Apps/Skill Diary` (Berechtigung `Files.ReadWrite.AppFolder`)
+- Ordnerangaben relativ zum App-Ordner (`Datenbank`, `Exporte`); alte Pfade werden automatisch umgestellt
+- Fehlt die Datenbank, erscheint ein Hinweis mit Umzugsanleitung statt einer automatisch angelegten leeren Datenbank
+
 ## 19 – 24.10.2026 (Sicherheit & Datenschutz)
 - Vorschau des anonymisierten Texts vor dem Senden an die KI (bearbeitbar, abschaltbar)
 - Whisper-Bibliothek und ONNX-Laufzeit fest im Repo statt von jsDelivr

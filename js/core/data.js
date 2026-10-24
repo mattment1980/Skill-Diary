@@ -5,8 +5,14 @@ import * as od from '../services/onedrive.js';
 import { toast, render } from '../ui/dom.js';
 
 /** Konfiguration (Spieler, Kompetenzen, Positionen) aus dem Excel laden und lokal zwischenspeichern. */
-export async function syncConfig() {
-  await od.ensureWorkbook();
+export async function syncConfig({ create = false } = {}) {
+  try {
+    await od.ensureWorkbook({ create });
+    S.noDb = false;
+  } catch (e) {
+    if (e instanceof od.NoWorkbookError) { S.noDb = true; render(); return; }
+    throw e;
+  }
   S.cfg = await od.readConfig();
   save('sd.cfg', S.cfg);
 }
@@ -14,6 +20,7 @@ export async function syncConfig() {
 /** Vorgemerkte Einträge ins Excel schreiben (z. B. nach Speichern ohne Netz). */
 export async function flushPending() {
   if (!S.pending.length) return;
+  if (S.noDb) throw new od.NoWorkbookError(); // Einträge bleiben vorgemerkt, bis die Datenbank da ist
   await od.appendFeedback(S.pending);
   const n = S.pending.length;
   S.pending = []; savePending();

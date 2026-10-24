@@ -16,6 +16,7 @@ export const S = {
   dictation: null,
   editId: null,                         // Eintrag in der Auswertung, der gerade bearbeitet wird
   edit: null,
+  noDb: false,                          // im App-Ordner liegt (noch) keine Datenbank
 };
 
 export const saveDraft = () => save('sd.draft', S.draft);
