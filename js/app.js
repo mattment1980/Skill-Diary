@@ -8,6 +8,8 @@ import { extractFeedback, summarize } from './ai.js';
 import { startDictation, localStatus, loadWhisper, WHISPER_MODELS } from './speech.js';
 import { buildDocx } from './export.js';
 
+const APP_VERSION = '4';
+
 /* ---------- Zustand ---------- */
 const S = {
   tab: 'capture',
@@ -413,6 +415,7 @@ function settingsView() {
   return h('section', { class: 'view settings' },
     h('div', { class: 'card' }, h('h3', {}, 'Konto'),
       h('p', {}, accountName()),
+      h('p', { class: 'hint' }, `App-Version ${APP_VERSION}`),
       h('button', { class: 'btn ghost', onclick: logout }, 'Abmelden')),
     h('div', { class: 'card' }, h('h3', {}, 'KI'),
       field('Anthropic-Schlüssel (bleibt nur auf diesem Handy)', 'apiKey', 'password'),
@@ -482,7 +485,12 @@ function loginView() {
 }
 
 async function start() {
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+  if ('serviceWorker' in navigator) {
+    // Neue Version aktiv -> Seite einmal neu laden, damit sie sofort genutzt wird.
+    const hadController = !!navigator.serviceWorker.controller;
+    navigator.serviceWorker.addEventListener('controllerchange', () => { if (hadController) location.reload(); });
+    navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then(r => r.update()).catch(() => {});
+  }
   let signedIn = false;
   try { signedIn = await initAuth(); } catch (e) { console.error(e); toast(`Anmeldung: ${e.message}`, 'error'); }
   if (!signedIn) return loginView();
