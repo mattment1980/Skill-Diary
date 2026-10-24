@@ -1,9 +1,11 @@
 // KI-Aufrufe (Anthropic API, direkt aus dem Browser). Es werden nur pseudonymisierte Texte gesendet.
-// Strukturierte Antworten über ein erzwungenes "Tool", damit kein freies JSON geparst werden muss.
+// Strukturierte Antworten über ein "Tool", damit kein freies JSON geparst werden muss.
+// Manche Modelle erlauben kein erzwungenes Tool (tool_choice) – dann wird per Anweisung verpflichtet.
 import { settings } from './config.js';
 
-async function callTool({ model, system, user, tool, maxTokens }) {
-  if (!settings.apiKey) throw new Error('Kein KI-Schlüssel hinterlegt (Einstellungen).');
+const noForcedTool = new Set(); // Modelle, die tool_choice "tool" ablehnen
+
+async function request(body) {
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -12,20 +14,34 @@ async function callTool({ model, system, user, tool, maxTokens }) {
       'anthropic-version': '2023-06-01',
       'anthropic-dangerous-direct-browser-access': 'true',
     },
-    body: JSON.stringify({
-      model, max_tokens: maxTokens, system,
-      tools: [tool], tool_choice: { type: 'tool', name: tool.name },
-      messages: [{ role: 'user', content: user }],
-    }),
+    body: JSON.stringify(body),
   });
   if (!res.ok) {
     let msg = res.status;
     try { msg = (await res.json()).error?.message || msg; } catch { /* */ }
-    throw new Error(`KI: ${msg}`);
+    const err = new Error(`KI: ${msg}`);
+    err.status = res.status;
+    throw err;
   }
-  const data = await res.json();
+  return res.json();
+}
+
+async function callTool({ model, system, user, tool, maxTokens }) {
+  if (!settings.apiKey) throw new Error('Kein KI-Schlüssel hinterlegt (Einstellungen).');
+  const base = { model, max_tokens: maxTokens, tools: [tool], messages: [{ role: 'user', content: user }] };
+  const forced = { ...base, system, tool_choice: { type: 'tool', name: tool.name } };
+  const free = { ...base, system: `${system}\n\nAntworte ausschließlich, indem du das Werkzeug "${tool.name}" genau einmal aufrufst.` };
+  let data;
+  if (noForcedTool.has(model)) data = await request(free);
+  else {
+    try { data = await request(forced); } catch (e) {
+      if (e.status !== 400 || !/tool_choice/i.test(e.message)) throw e;
+      noForcedTool.add(model);
+      data = await request(free);
+    }
+  }
   const block = data.content.find(c => c.type === 'tool_use');
-  if (!block) throw new Error('KI: keine strukturierte Antwort');
+  if (!block) throw new Error(data.stop_reason === 'max_tokens' ? 'KI: Antwort zu lang abgeschnitten – bitte erneut versuchen' : 'KI: keine strukturierte Antwort');
   return block.input;
 }
 
@@ -84,7 +100,7 @@ Regeln:
 Katalog:
 ${catalogText(skills)}`;
   const user = `Heute: ${dateStr}. Spieler-Codes im Text: ${[...codes.keys()].join(', ') || 'keine'}.\n\nNotiz:\n${text}`;
-  return callTool({ model: settings.modelExtract, system, user, tool, maxTokens: 2000 });
+  return callTool({ model: settings.modelExtract, system, user, tool, maxTokens: 4000 });
 }
 
 /** Erstellt die Spieler-Zusammenfassung aus (pseudonymisierten) Einträgen. */
@@ -115,5 +131,5 @@ Grundlage sind ausschließlich die Trainer-Notizen; nichts erfinden.
 - verbessern: max. 5 kurze Stichpunkte, positiv formuliert als nächste Schritte.
 - stolz: 1–2 Themenblöcke "Darauf kannst du stolz sein" mit kurzem Titel und 1–2 Sätzen.`;
   const user = `Zeitraum: ${period}\nNotizen (Datum | Anlass | Bereich/Skill | Bewertung | Kommentar):\n${lines.join('\n')}`;
-  return callTool({ model: settings.modelSummary, system, user, tool, maxTokens: 1500 });
+  return callTool({ model: settings.modelSummary, system, user, tool, maxTokens: 4000 });
 }
