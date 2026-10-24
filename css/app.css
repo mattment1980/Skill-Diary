@@ -182,3 +182,18 @@ label.check { display: flex; gap: 10px; align-items: center; color: var(--muted)
 .lg-me::before { background: var(--orange) !important; }
 .lg-team::before { background: transparent !important; border: 1.5px dashed var(--neu); }
 .lg-ref::before { background: transparent !important; border: 1.5px dashed var(--muted); border-radius: 50% !important; }
+
+/* Skill-Liste */
+.sk-group { display: flex; flex-direction: column; gap: 2px; }
+.sk-area { font: 700 .95rem 'Barlow Condensed', sans-serif; color: var(--muted); text-transform: uppercase; margin-top: 6px; }
+.sk-row { display: grid; grid-template-columns: minmax(0, 1.25fr) 1fr 30px 30px; align-items: center; gap: 8px; background: transparent; border: 0; border-radius: 8px; padding: 5px 4px; color: var(--text); font: inherit; font-size: .88rem; text-align: left; }
+.sk-row.on { background: var(--surface-2); }
+.sk-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sk-bar { position: relative; height: 12px; border-radius: 6px; background: var(--surface-2); overflow: hidden; }
+.sk-fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 6px; background: var(--neu); }
+.sk-fill.l1 { background: #e5484d; } .sk-fill.l2 { background: #f28c28; } .sk-fill.l3 { background: #c9d1cc; } .sk-fill.l4 { background: #5fd18f; } .sk-fill.l5 { background: #1fa463; }
+.sk-ref { position: absolute; left: 60%; top: -2px; bottom: -2px; width: 2px; background: var(--text); opacity: .7; }
+.sk-val { font-weight: 700; text-align: right; }
+.sk-n { color: var(--muted); font-size: .8rem; }
+.list-title { display: flex; align-items: center; gap: 8px; }
+.mini.clear { width: auto; padding: 0 10px; font-size: .8rem; margin-left: auto; }

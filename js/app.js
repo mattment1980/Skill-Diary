@@ -8,7 +8,7 @@ import { extractFeedback, summarize } from './ai.js';
 import { startDictation, localStatus, loadWhisper, whisperCached, WHISPER_MODELS, WHISPER_DEVICES } from './speech.js';
 import { buildDocx } from './export.js';
 
-const APP_VERSION = '14';
+const APP_VERSION = '15';
 
 /* ---------- Zustand ---------- */
 const S = {
@@ -18,7 +18,7 @@ const S = {
   draft: load('sd.draft', { art: '', date: today(), anlass: '', text: '' }),
   review: null,                         // aktuell zu prüfende Einträge
   feedback: null,                       // geladene Feedback-Daten (nur im Speicher)
-  stats: { player: '', from: CONFIG.seasonStart, to: today(), area: '' },
+  stats: { player: '', from: CONFIG.seasonStart, to: today(), area: '', skill: '' },
   summary: null,
   busy: '',
   dictation: null,
@@ -317,7 +317,7 @@ function statsView() {
 
   const all = S.feedback.filter(f => f.Spieler === st.player && (!f.Datum || (f.Datum >= st.from && f.Datum <= st.to)))
     .sort((a, b) => String(b.Datum).localeCompare(String(a.Datum)));
-  const list = st.area ? all.filter(f => f.Bereich === st.area) : all;
+  const list = st.skill ? all.filter(f => f.Skill === st.skill) : st.area ? all.filter(f => f.Bereich === st.area) : all;
   const count = (rows, r) => rows.filter(f => f.Bewertung === r).length;
   const bar = rows => {
     const t = rows.length || 1;
@@ -331,13 +331,14 @@ function statsView() {
       h('div', { class: 'totals' }, ...CONFIG.ratings.map(r => h('div', { class: `total r-${r.toLowerCase()}` }, h('b', {}, count(all, r)), r))),
       ...areas().map(a => {
         const rows = all.filter(f => f.Bereich === a);
-        return h('button', { class: `area-row ${st.area === a ? 'on' : ''}`, onclick: () => { st.area = st.area === a ? '' : a; render(); } },
+        return h('button', { class: `area-row ${st.area === a ? 'on' : ''}`, onclick: () => { st.area = st.area === a ? '' : a; st.skill = ''; render(); } },
           h('span', { class: 'area-name' }, a, h('small', {}, ` ${rows.length}`)), bar(rows));
       })),
     radar(all, st.player),
+    skillBars(all),
     timeline(list, st.area),
     S.summary ? summaryEditor() : h('button', { class: 'btn primary block', disabled: !all.length, onclick: () => makeSummary(all) }, 'Zusammenfassung erstellen'),
-    h('h3', { class: 'list-title' }, st.area ? `${st.area} (${list.length})` : `Alle Einträge (${list.length})`),
+    h('h3', { class: 'list-title' }, st.skill || st.area || 'Alle Einträge', ` (${list.length})`, (st.skill || st.area) ? h('button', { class: 'mini clear', onclick: () => { st.skill = ''; st.area = ''; render(); } }, '✕ Filter') : null),
     ...list.map(f => (S.editId === f.ID ? editCard(f) : h('div', { class: `card fb r-${String(f.Bewertung).toLowerCase()}` },
       h('div', { class: 'fb-head' },
         h('div', { class: 'fb-meta' }, `${fmtDate(f.Datum)} · ${[f.Art, f.Anlass].filter(Boolean).join(' ') || '–'}${f.Position ? ' · ' + f.Position : ''}`),
@@ -390,6 +391,28 @@ async function removeFeedback(f) {
     S.summary = null;
     toast('Gelöscht', 'ok');
   });
+}
+
+/** Skill-Liste: Durchschnittsniveau je Skill als Balken (Markierung bei 3), gruppiert nach Bereich. Antippen filtert. */
+function skillBars(rows) {
+  const st = S.stats;
+  const groups = areas().map(a => h('div', { class: 'sk-group' },
+    h('div', { class: 'sk-area' }, a),
+    ...skillsOf(a).map(sk => {
+      const all = rows.filter(f => f.Skill === sk);
+      const lv = all.filter(f => Number(f.Niveau) >= 1).map(f => Number(f.Niveau));
+      const avg = lv.length ? lv.reduce((x, y) => x + y, 0) / lv.length : 0;
+      return h('button', { class: `sk-row ${st.skill === sk ? 'on' : ''}`, onclick: () => { st.skill = st.skill === sk ? '' : sk; st.area = ''; render(); } },
+        h('span', { class: 'sk-name' }, sk),
+        h('span', { class: 'sk-bar' },
+          avg ? h('span', { class: `sk-fill l${Math.round(avg)}`, style: `width:${((avg - 0) / 5) * 100}%` }) : null,
+          h('span', { class: 'sk-ref' })),
+        h('span', { class: 'sk-val' }, avg ? avg.toFixed(1).replace('.', ',') : '–'),
+        h('span', { class: 'sk-n' }, `(${all.length})`));
+    })));
+  return h('div', { class: 'card' }, h('h3', {}, 'Niveau je Skill'),
+    h('p', { class: 'hint' }, 'Balken = Ø Niveau (Strich bei 3 = altersgemäß), Klammer = Anzahl Einträge. Antippen filtert die Liste.'),
+    ...groups);
 }
 
 /** Spinnendiagramm: durchschnittliches Niveau je Kompetenzbereich (Spieler vs. Team im selben Zeitraum). */
