@@ -158,3 +158,27 @@ label.check { display: flex; gap: 10px; align-items: center; color: var(--muted)
 .lg::before { content: ''; display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; background: var(--neu); }
 .lg.r-positiv::before { background: var(--pos); } .lg.r-kritisch::before { background: var(--krit); }
 .legend .hint { margin-left: auto; }
+
+/* Niveau 1–5 */
+.levels { display: flex; flex-direction: column; gap: 6px; }
+.levels-label { display: flex; justify-content: space-between; color: var(--muted); font-size: .85rem; }
+.levels-label small { color: var(--text); }
+.level-btns { display: flex; gap: 6px; }
+.lvl { flex: 1; height: 42px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface-2); color: var(--text); font: 700 1.1rem 'Barlow Condensed', sans-serif; }
+.lvl.on.l1 { background: #e5484d; border-color: #e5484d; } .lvl.on.l2 { background: #f28c28; border-color: #f28c28; color: #1a1006; }
+.lvl.on.l3 { background: #c9d1cc; border-color: #c9d1cc; color: #0d110f; } .lvl.on.l4 { background: #5fd18f; border-color: #5fd18f; color: #06150d; }
+.lvl.on.l5 { background: #1fa463; border-color: #1fa463; }
+.tags { display: flex; gap: 6px; }
+.lvl-tag { color: var(--text); }
+/* Spinnendiagramm */
+.radar svg { width: 100%; height: auto; display: block; }
+.rd-grid { fill: none; stroke: var(--line); stroke-width: 1; }
+.rd-ref { fill: none; stroke: var(--muted); stroke-width: 1.2; stroke-dasharray: 4 3; }
+.rd-team { fill: rgba(154,168,160,.12); stroke: var(--neu); stroke-width: 1.2; stroke-dasharray: 3 3; }
+.rd-me { fill: rgba(242,140,40,.28); stroke: var(--orange); stroke-width: 2; }
+.rd-dot { fill: var(--orange); }
+.rd-l { font-size: 11px; fill: var(--text); font-weight: 600; }
+.rd-v { font-size: 11px; fill: var(--orange); font-weight: 700; }
+.lg-me::before { background: var(--orange) !important; }
+.lg-team::before { background: transparent !important; border: 1.5px dashed var(--neu); }
+.lg-ref::before { background: transparent !important; border: 1.5px dashed var(--muted); border-radius: 50% !important; }

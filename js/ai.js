@@ -79,9 +79,10 @@ export async function extractFeedback({ text, codes, skills, positions, dateStr 
               skill: { type: 'string', enum: [...skills.map(s => s.skill), ''] },
               bewertung: { type: 'string', enum: ['Positiv', 'Neutral', 'Kritisch'] },
               position: { type: 'string', enum: [...positions.map(p => p.code), ''] },
+              niveau: { type: 'integer', minimum: 1, maximum: 5, description: 'Leistungsniveau im Altersvergleich' },
               kommentar: { type: 'string' },
             },
-            required: ['spieler', 'bereich', 'skill', 'bewertung', 'position', 'kommentar'],
+            required: ['spieler', 'bereich', 'skill', 'bewertung', 'position', 'kommentar', 'niveau'],
           },
         },
       },
@@ -95,6 +96,7 @@ Regeln:
 - Bereich und Skill nur aus dem Katalog. Ist der Skill nicht eindeutig, lass skill leer (bereich wenn möglich setzen).
 - Bewertung: Positiv = Lob/Fortschritt, Kritisch = Defizit/Arbeitsauftrag, Neutral = beschreibend oder gemischt.
 - Kommentar: Aussage des Trainers knapp und sachlich auf Deutsch, nah an seiner Formulierung, Codes statt Namen.
+- Niveau 1–5 = gezeigtes Leistungsniveau im Vergleich zum altersgemäß Erwartbaren (U10/U11): 1 weit darunter, 2 darunter, 3 altersgemäß, 4 darüber, 5 weit darüber. Unabhängig von der Bewertung: Lob für Fortschritt kann auf Niveau 2 liegen, Kritik bei einem starken Spieler auf Niveau 4. Ohne klare Hinweise 3.
 - Position nur, wenn genannt (Verteidiger links=LV, rechts=RV, Mittelfeld links/zentral/rechts=LM/ZM/RM, Sturm=ST, Tor=TW).
 - Kontext: Spiel oder Training, Anlass (Gegner/Ort/Turnier) und Datum nur, wenn erkennbar. Relative Angaben (gestern, Samstag) anhand des heutigen Datums auflösen.
 Katalog:
@@ -126,10 +128,11 @@ export async function summarize({ code, lines, period }) {
 Sprich das Kind direkt mit "du" an, ermutigend, ehrlich und konkret, in einfacher Sprache. Keine Namen nennen.
 Das Kind heißt im Material ${code}. Andere Codes sind Mitspieler – nicht erwähnen.
 Grundlage sind ausschließlich die Trainer-Notizen; nichts erfinden.
+Niveau (1–5) = Stand im Altersvergleich (3 = altersgemäß); Bewertung = Tendenz/Entwicklung. Berücksichtige beides: auch große Fortschritte auf niedrigem Niveau würdigen, bei hohem Niveau Kritik als nächsten Schritt einordnen.
 - einschaetzung: allgemeine Einschätzung der Trainer inkl. Entwicklung im Zeitraum, max. 100 Wörter, Perspektive "wir Trainer".
 - super: max. 5 kurze Stichpunkte "Das machst du schon super".
 - verbessern: max. 5 kurze Stichpunkte, positiv formuliert als nächste Schritte.
 - stolz: 1–2 Themenblöcke "Darauf kannst du stolz sein" mit kurzem Titel und 1–2 Sätzen.`;
-  const user = `Zeitraum: ${period}\nNotizen (Datum | Anlass | Bereich/Skill | Bewertung | Kommentar):\n${lines.join('\n')}`;
+  const user = `Zeitraum: ${period}\nNotizen (Datum | Anlass | Bereich/Skill | Bewertung | Niveau | Kommentar):\n${lines.join('\n')}`;
   return callTool({ model: settings.modelSummary, system, user, tool, maxTokens: 4000 });
 }

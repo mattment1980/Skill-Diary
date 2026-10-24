@@ -9,7 +9,8 @@ export const CONFIG = {
   templateUrl: 'template/Skill-Diary-Vorlage.xlsx',
   feedbackTable: 'Feedback',
   feedbackColumns: ['ID', 'Zeitstempel', 'Datum', 'Art', 'Anlass', 'Spieler', 'Position', 'Bereich',
-    'Skill', 'Bewertung', 'Kommentar', 'Quelle', 'Gruppe', 'VideoLink'],
+    'Skill', 'Bewertung', 'Kommentar', 'Quelle', 'Gruppe', 'VideoLink', 'Niveau'],
+  levels: { 1: 'weit unter altersgemäß', 2: 'unter altersgemäß', 3: 'altersgemäß', 4: 'über altersgemäß', 5: 'weit über altersgemäß' },
   ratings: ['Positiv', 'Neutral', 'Kritisch'],
   seasonStart: '2026-07-01',
 };

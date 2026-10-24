@@ -44,7 +44,24 @@ export async function ensureWorkbook() {
     });
   }
   workbookId = item.id;
+  await migrateFeedbackColumns();
   return item;
+}
+
+let migrated = false;
+/** Ergänzt fehlende Spalten (z. B. "Niveau") in bestehenden Datenbanken – einmal pro Sitzung geprüft. */
+async function migrateFeedbackColumns() {
+  if (migrated) return;
+  const r = await graph(`${wb()}/tables('${CONFIG.feedbackTable}')/headerRowRange?$select=values`);
+  const have = r.values[0];
+  for (const name of CONFIG.feedbackColumns.filter(c => !have.includes(c))) {
+    const col = await graph(`${wb()}/tables('${CONFIG.feedbackTable}')/columns/add`, { method: 'POST', body: { index: null } });
+    // Spaltenkopf direkt beschriften (benennt die Tabellenspalte um)
+    await graph(`${wb()}/tables('${CONFIG.feedbackTable}')/columns('${encodeURIComponent(col.id)}')/headerRowRange`, {
+      method: 'PATCH', body: { values: [[name]] },
+    });
+  }
+  migrated = true;
 }
 
 /** Excel-Seriennummer -> YYYY-MM-DD (Excel liefert Datumszellen als Zahl). */
@@ -94,7 +111,11 @@ export async function writeConfig(cfg) {
 
 /** Hängt Feedback-Zeilen (Arrays in Spaltenreihenfolge) an die Tabelle an. */
 export async function appendFeedback(rows) {
-  await graph(`${wb()}/tables('${CONFIG.feedbackTable}')/rows/add`, { method: 'POST', body: { values: rows } });
+  if (!migrated && workbookId) await migrateFeedbackColumns();
+  // Ältere vorgemerkte Zeilen haben evtl. weniger Spalten -> auffüllen
+  const n = CONFIG.feedbackColumns.length;
+  const values = rows.map(r => [...r, ...Array(Math.max(0, n - r.length)).fill('')].slice(0, n));
+  await graph(`${wb()}/tables('${CONFIG.feedbackTable}')/rows/add`, { method: 'POST', body: { values } });
 }
 
 /** Liest alle Feedback-Zeilen als Objekte. */

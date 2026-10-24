@@ -8,7 +8,7 @@ import { extractFeedback, summarize } from './ai.js';
 import { startDictation, localStatus, loadWhisper, whisperCached, WHISPER_MODELS, WHISPER_DEVICES } from './speech.js';
 import { buildDocx } from './export.js';
 
-const APP_VERSION = '13';
+const APP_VERSION = '14';
 
 /* ---------- Zustand ---------- */
 const S = {
@@ -178,7 +178,7 @@ async function toggleDictation() {
   }
 }
 
-const emptyEntry = (o = {}) => ({ id: uid(), player: null, area: '', skill: '', rating: '', position: '', comment: '', ...o });
+const emptyEntry = (o = {}) => ({ id: uid(), player: null, area: '', skill: '', rating: '', level: 0, position: '', comment: '', ...o });
 
 async function manualEntry() {
   await stopDictation();
@@ -203,6 +203,7 @@ async function runAI() {
         player: codes.get(e.spieler) || null,
         skill, area: skill ? areaOfSkill(skill) : (areas().includes(e.bereich) ? e.bereich : ''),
         rating: e.bewertung || '', position: e.position || '',
+        level: Number(e.niveau) >= 1 && Number(e.niveau) <= 5 ? Number(e.niveau) : 0,
         comment: deanonymize(e.kommentar, codes, displayName),
       });
     });
@@ -220,6 +221,16 @@ async function runAI() {
 }
 
 /* ---------- Prüfen ---------- */
+/** Knöpfe 1–5 für das Niveau im Altersvergleich. */
+function levelPicker(value, onpick) {
+  return h('div', { class: 'levels' },
+    h('span', { class: 'levels-label' }, 'Niveau', h('small', {}, value ? CONFIG.levels[value] : 'im Altersvergleich')),
+    h('div', { class: 'level-btns' }, ...[1, 2, 3, 4, 5].map(n => h('button', {
+      class: `lvl l${n} ${Number(value) === n ? 'on' : ''} ${value ? '' : 'missing'}`, title: CONFIG.levels[n],
+      onclick: () => onpick(n),
+    }, String(n)))));
+}
+
 function select(value, options, onchange, placeholder, optional = false) {
   return h('select', { class: value || optional ? '' : 'missing', onchange: e => onchange(e.target.value) },
     h('option', { value: '' }, placeholder),
@@ -241,6 +252,7 @@ function reviewView() {
       class: `chip r-${r.toLowerCase()} ${e.rating === r ? 'on' : ''} ${e.rating ? '' : 'missing'}`,
       onclick: () => { e.rating = r; render(); },
     }, r))),
+    levelPicker(e.level, n => { e.level = n; render(); }),
     h('div', { class: 'row' },
       select(e.area, areas(), v => { e.area = v; if (!skillsOf(v).includes(e.skill)) e.skill = ''; render(); }, 'Bereich'),
       select(e.skill, skillsOf(e.area).length ? skillsOf(e.area) : S.cfg.skills.map(s => s.skill),
@@ -264,13 +276,13 @@ function reviewView() {
 
 async function saveReview() {
   const R = S.review;
-  const bad = R.entries.find(e => !e.player || !e.skill || !e.rating || !e.comment.trim());
-  if (bad) return toast('Bitte bei allen Einträgen Spieler, Skill, Bewertung und Kommentar ausfüllen.', 'error');
+  const bad = R.entries.find(e => !e.player || !e.skill || !e.rating || !e.level || !e.comment.trim());
+  if (bad) return toast('Bitte bei allen Einträgen Spieler, Skill, Bewertung, Niveau und Kommentar ausfüllen.', 'error');
   const group = uid().slice(0, 6);
   const now = new Date();
   const stamp = `${today()} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
   const rows = R.entries.map(e => [uid(), stamp, R.kontext.date || '', R.kontext.art || '', R.kontext.anlass || '',
-    e.player.name, e.position || '', e.area, e.skill, e.rating, e.comment.trim(), R.source, group, '']);
+    e.player.name, e.position || '', e.area, e.skill, e.rating, e.comment.trim(), R.source, group, '', e.level]);
   S.pending.push(...rows); savePending();
   S.review = null;
   S.draft = { art: S.draft.art, date: today(), anlass: '', text: '' }; saveDraft();
@@ -322,6 +334,7 @@ function statsView() {
         return h('button', { class: `area-row ${st.area === a ? 'on' : ''}`, onclick: () => { st.area = st.area === a ? '' : a; render(); } },
           h('span', { class: 'area-name' }, a, h('small', {}, ` ${rows.length}`)), bar(rows));
       })),
+    radar(all, st.player),
     timeline(list, st.area),
     S.summary ? summaryEditor() : h('button', { class: 'btn primary block', disabled: !all.length, onclick: () => makeSummary(all) }, 'Zusammenfassung erstellen'),
     h('h3', { class: 'list-title' }, st.area ? `${st.area} (${list.length})` : `Alle Einträge (${list.length})`),
@@ -330,7 +343,7 @@ function statsView() {
         h('div', { class: 'fb-meta' }, `${fmtDate(f.Datum)} · ${[f.Art, f.Anlass].filter(Boolean).join(' ') || '–'}${f.Position ? ' · ' + f.Position : ''}`),
         h('button', { class: 'mini', 'aria-label': 'Bearbeiten', onclick: () => { S.editId = f.ID; S.edit = { ...f }; render(); } }, '✎'),
         h('button', { class: 'mini', 'aria-label': 'Löschen', onclick: () => removeFeedback(f) }, '✕')),
-      h('div', { class: 'fb-skill' }, f.Skill, h('span', { class: 'tag' }, f.Bewertung)),
+      h('div', { class: 'fb-skill' }, f.Skill, h('span', { class: 'tags' }, Number(f.Niveau) ? h('span', { class: `tag lvl-tag l${f.Niveau}` }, `Niveau ${f.Niveau}`) : null, h('span', { class: 'tag' }, f.Bewertung))),
       h('div', {}, f.Kommentar)))));
 }
 
@@ -345,6 +358,7 @@ function editCard(f) {
     h('div', { class: 'rating' }, ...CONFIG.ratings.map(r => h('button', {
       class: `chip r-${r.toLowerCase()} ${e.Bewertung === r ? 'on' : ''}`, onclick: () => { e.Bewertung = r; render(); },
     }, r))),
+    levelPicker(Number(e.Niveau) || 0, n => { e.Niveau = n; render(); }),
     h('div', { class: 'row' },
       select(e.Bereich, areas(), v => { e.Bereich = v; if (!skillsOf(v).includes(e.Skill)) e.Skill = ''; render(); }, 'Bereich'),
       select(e.Skill, skillsOf(e.Bereich).length ? skillsOf(e.Bereich) : S.cfg.skills.map(s => s.skill), v => { e.Skill = v; e.Bereich = areaOfSkill(v); render(); }, 'Skill')),
@@ -358,7 +372,7 @@ function editCard(f) {
 async function saveEdit() {
   const e = S.edit;
   if (!e.Skill || !e.Bewertung || !String(e.Kommentar).trim()) return toast('Skill, Bewertung und Kommentar ausfüllen.', 'error');
-  const patch = { Datum: e.Datum || '', Art: e.Art || '', Anlass: e.Anlass || '', Bereich: e.Bereich, Skill: e.Skill,
+  const patch = { Datum: e.Datum || '', Art: e.Art || '', Anlass: e.Anlass || '', Bereich: e.Bereich, Skill: e.Skill, Niveau: Number(e.Niveau) || '',
     Bewertung: e.Bewertung, Position: e.Position || '', Kommentar: String(e.Kommentar).trim() };
   await withBusy('Speichere Änderung …', async () => {
     await od.updateFeedback(e.ID, patch);
@@ -376,6 +390,50 @@ async function removeFeedback(f) {
     S.summary = null;
     toast('Gelöscht', 'ok');
   });
+}
+
+/** Spinnendiagramm: durchschnittliches Niveau je Kompetenzbereich (Spieler vs. Team im selben Zeitraum). */
+function radar(rows, playerName) {
+  const A = areas();
+  const inRange = f => !f.Datum || (f.Datum >= S.stats.from && f.Datum <= S.stats.to);
+  const avg = (list, a) => {
+    const v = list.filter(f => f.Bereich === a && Number(f.Niveau) >= 1).map(f => Number(f.Niveau));
+    return v.length ? { val: v.reduce((x, y) => x + y, 0) / v.length, n: v.length } : null;
+  };
+  const me = A.map(a => avg(rows, a));
+  const team = A.map(a => avg(S.feedback.filter(inRange), a));
+  const card = (...k) => h('div', { class: 'card' }, h('h3', {}, 'Niveau je Bereich'), ...k);
+  if (!me.some(Boolean)) return card(h('p', { class: 'hint' }, 'Noch keine Einträge mit Niveau im Zeitraum. Das Niveau wird ab jetzt bei jedem neuen Eintrag erfasst und lässt sich bei alten Einträgen über ✎ nachtragen.'));
+
+  const W = 390, H = 260, cx = W / 2, cy = 128, R = 84, n = A.length;
+  const ang = i => -Math.PI / 2 + (2 * Math.PI * i) / n;
+  const pt = (i, v) => [cx + Math.cos(ang(i)) * R * (v / 5), cy + Math.sin(ang(i)) * R * (v / 5)];
+  const poly = vals => vals.map((v, i) => pt(i, v ? v.val : 0).map(x => x.toFixed(1)).join(',')).join(' ');
+  let svg = '';
+  for (let lvl = 1; lvl <= 5; lvl++) {
+    svg += `<polygon points="${A.map((_, i) => pt(i, lvl).join(',')).join(' ')}" class="${lvl === 3 ? 'rd-ref' : 'rd-grid'}"/>`;
+  }
+  A.forEach((a, i) => {
+    const [x, y] = pt(i, 5);
+    svg += `<line x1="${cx}" y1="${cy}" x2="${x}" y2="${y}" class="rd-grid"/>`;
+    const [lx, ly] = pt(i, 5.75);
+    const anchor = Math.abs(lx - cx) < 5 ? 'middle' : lx > cx ? 'start' : 'end';
+    const label = a.split(' / ')[0];
+    svg += `<text x="${lx}" y="${ly}" text-anchor="${anchor}" class="rd-l">${label}</text>`;
+    svg += `<text x="${lx}" y="${ly + 13}" text-anchor="${anchor}" class="rd-v">${me[i] ? me[i].val.toFixed(1).replace('.', ',') : '–'}</text>`;
+  });
+  if (team.some(Boolean)) svg += `<polygon points="${poly(team)}" class="rd-team"/>`;
+  svg += `<polygon points="${poly(me)}" class="rd-me"/>`;
+  me.forEach((v, i) => { if (v) { const [x, y] = pt(i, v.val); svg += `<circle cx="${x}" cy="${y}" r="3.5" class="rd-dot"/>`; } });
+  const chart = h('div', { class: 'radar' });
+  chart.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Niveau je Kompetenzbereich">${svg}</svg>`;
+  const counted = me.reduce((s, v) => s + (v ? v.n : 0), 0);
+  return card(chart,
+    h('div', { class: 'legend' },
+      h('span', { class: 'lg lg-me' }, firstName(playerName)),
+      h('span', { class: 'lg lg-team' }, 'Team-Schnitt'),
+      h('span', { class: 'lg lg-ref' }, '3 = altersgemäß')),
+    h('p', { class: 'hint' }, `Grundlage: ${counted} Einträge mit Niveau im Zeitraum.`));
 }
 
 /** Zeitleiste: gestapelte Säulen je Monat (bei bis zu ~10 Wochen je Woche) mit Positiv/Neutral/Kritisch. */
@@ -464,7 +522,7 @@ async function makeSummary(rows) {
   const player = S.cfg.players.find(p => p.name === S.stats.player);
   await withBusy('Zusammenfassung wird geschrieben …', async () => {
     const code = 'P-ICH';
-    const lines = [...rows].reverse().map(f => `${fmtDate(f.Datum)} | ${[f.Art, f.Anlass].filter(Boolean).join(' ') || '–'} | ${f.Bereich}/${f.Skill} | ${f.Bewertung} | ${String(f.Kommentar).replace(/\n/g, ' ')}`);
+    const lines = [...rows].reverse().map(f => `${fmtDate(f.Datum)} | ${[f.Art, f.Anlass].filter(Boolean).join(' ') || '–'} | ${f.Bereich}/${f.Skill} | ${f.Bewertung} | ${Number(f.Niveau) || '–'} | ${String(f.Kommentar).replace(/\n/g, ' ')}`);
     const { text } = await anonymize(lines.join('\n'), S.cfg.players,
       async (_t, cands) => (cands.includes(player) ? player : null), { player, code });
     const period = `${fmtDate(S.stats.from)} – ${fmtDate(S.stats.to)}`;
