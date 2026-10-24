@@ -8,7 +8,7 @@ import { extractFeedback, summarize } from './ai.js';
 import { startDictation, localStatus, loadWhisper, WHISPER_MODELS } from './speech.js';
 import { buildDocx } from './export.js';
 
-const APP_VERSION = '4';
+const APP_VERSION = '5';
 
 /* ---------- Zustand ---------- */
 const S = {
@@ -415,7 +415,6 @@ function settingsView() {
   return h('section', { class: 'view settings' },
     h('div', { class: 'card' }, h('h3', {}, 'Konto'),
       h('p', {}, accountName()),
-      h('p', { class: 'hint' }, `App-Version ${APP_VERSION}`),
       h('button', { class: 'btn ghost', onclick: logout }, 'Abmelden')),
     h('div', { class: 'card' }, h('h3', {}, 'KI'),
       field('Anthropic-Schlüssel (bleibt nur auf diesem Handy)', 'apiKey', 'password'),
@@ -438,6 +437,7 @@ function settingsView() {
       () => ({ name: '', aliases: [], active: true })),
     rowsEditor('Kompetenzen', cfg.skills, [['area', 'Bereich'], ['skill', 'Skill']], () => ({ area: '', skill: '' })),
     rowsEditor('Positionen', cfg.positions, [['group', 'Gruppe'], ['code', 'Kürzel'], ['label', 'Bezeichnung']], () => ({ group: '', code: '', label: '' })),
+    h('p', { class: 'hint version' }, `Skill Diary · Version ${APP_VERSION}`),
     h('div', { class: 'actions sticky' },
       h('button', { class: 'btn ghost', onclick: () => withBusy('Lade aus OneDrive …', syncConfig) }, 'Neu laden'),
       h('button', { class: 'btn primary', onclick: saveConfig }, 'Speichern')));

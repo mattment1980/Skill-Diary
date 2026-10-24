@@ -141,3 +141,5 @@ label.check { display: flex; gap: 10px; align-items: center; color: var(--muted)
 .login, .splash { min-height: 92vh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; text-align: center; }
 .login h1 { font-size: 2.6rem; margin: 0; text-transform: uppercase; }
 .login .leo { width: 220px; -webkit-mask-image: radial-gradient(ellipse 60% 55% at 50% 45%, #000 60%, transparent 100%); mask-image: radial-gradient(ellipse 60% 55% at 50% 45%, #000 60%, transparent 100%); }
+
+.version { text-align: center; margin: 8px 0; }
