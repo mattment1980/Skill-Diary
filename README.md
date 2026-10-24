@@ -5,7 +5,7 @@ diktieren oder tippen → KI ordnet Spieler, Kompetenzbereich, Skill, Bewertung 
 Ablage als Zeilen in einer Excel-Datei im eigenen OneDrive (App-Ordner `Apps/Skill Diary`, im deutschen OneDrive `Anwendungen/Skill Diary`). Dazu Auswertung je Spieler (Verlauf, Niveau je Bereich/Skill) und ein
 Entwicklungsgespräch als PowerPoint (KI-Zusammenfassung + Grafiken, im Vereinslayout).
 
-App: https://mattment1980.github.io/Skill-Diary/
+App: https://skilldiary.mentschel.com
 
 ## Datenschutz
 
@@ -47,8 +47,9 @@ tests/            npm test
 
 ## Einrichtung
 
-1. GitHub Pages: Settings → Pages → Branch `main`, Ordner `/ (root)`.
-2. Azure App-Registrierung (SPA), Redirect-URI `https://mattment1980.github.io/Skill-Diary/`,
+1. GitHub Pages: Settings → Pages → Branch `main`, Ordner `/ (root)`, Custom domain `skilldiary.mentschel.com`
+   (Datei `CNAME`; DNS bei IONOS: CNAME `skilldiary` → `mattment1980.github.io`), „Enforce HTTPS“ aktiv.
+2. Azure App-Registrierung (SPA), Redirect-URI `https://skilldiary.mentschel.com/`,
    Berechtigungen `Files.ReadWrite.AppFolder`, `offline_access` (kein `Files.ReadWrite`). Client-ID steht in `js/core/config.js`.
 3. In der App unter Einstellungen den Anthropic-Schlüssel eintragen.
 

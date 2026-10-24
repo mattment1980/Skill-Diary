@@ -1,5 +1,8 @@
 # Changelog
 
+## 25 (Umzug) – 24.10.2026
+- Eigene Adresse `skilldiary.mentschel.com` (getrennt vom Dokumentenmanager)
+
 ## 25 – 24.10.2026
 - Abmelden entfernt zusätzlich Sprachmodell, Offline-Dateien, Service Worker und Anmelde-Zwischenspeicher dieser App (Vorbereitung Umzug auf eigene Domain)
 

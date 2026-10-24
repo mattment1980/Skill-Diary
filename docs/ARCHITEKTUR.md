@@ -1,7 +1,7 @@
 # Architektur
 
 Skill Diary ist eine **statische Web-App ohne Build-Schritt**: reine ES-Module im Browser, gehostet über
-GitHub Pages. Es gibt keinen eigenen Server und keine Datenbank – alle Spieler- und Feedbackdaten liegen
+GitHub Pages unter `https://skilldiary.mentschel.com`. Es gibt keinen eigenen Server und keine Datenbank – alle Spieler- und Feedbackdaten liegen
 in einer Excel-Datei im OneDrive des Trainers.
 
 ## Schichten
@@ -80,14 +80,13 @@ bestehenden Dateien automatisch, ältere vorgemerkte Zeilen werden aufgefüllt.
 | Content Security Policy: Code nur aus dem Repo; Verbindungen nur zu Microsoft, Anthropic, Hugging Face | `index.html` |
 | Inhalte aus dem Excel werden vor `innerHTML` maskiert (`esc`) | `ui/charts.js` |
 | Abmelden löscht alle lokalen App-Daten (`sd.*`) inkl. KI-Schlüssel | `services/auth.js` `clearLocalData` |
+| Eigene Adresse `skilldiary.mentschel.com` – kein gemeinsamer Browser-Speicher mit anderen Apps | `CNAME` |
 | Berechtigung nur für den App-Ordner (`Files.ReadWrite.AppFolder`); Pfade relativ zu `special/approot` | `core/config.js`, `services/onedrive.js` |
 | Fehlt die Datenbank, wird nie automatisch eine leere angelegt (Hinweis mit Umzugsanleitung) | `services/onedrive.js` `NoWorkbookError`, `ui/shell.js` |
 | Exporte nur ins OneDrive; Download aufs Handy nur auf Wunsch | `views/stats.js`, Einstellungen |
 | Spracheingabe lokal (Chrome lokal bzw. Whisper im Browser); Cloud nur nach ausdrücklicher Einstellung | `services/speech.js` |
 
 **Bekannte Restrisiken**
-- *Gleiche Herkunft wie der Dokumentenmanager* (`mattment1980.github.io`): beide Apps teilen sich den
-  Browser-Speicher (Anmeldungen, Schlüssel). Abhilfe: eigene Adresse für Skill Diary.
 - *Video-Verknüpfungen* (geplant) funktionieren nur für Videos, die im App-Ordner liegen.
 - *Pseudonymisierung ≠ Anonymisierung*: nicht hinterlegte Namen, falsch erkannte Namen und Inhalte
   (Gesundheit, Familie) gehen im Klartext an die KI, sofern sie in der Vorschau nicht entfernt werden.
