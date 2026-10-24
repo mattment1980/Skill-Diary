@@ -1,8 +1,15 @@
-// Service Worker: speichert nur die App-Dateien zwischen (keine Spieler- oder Feedbackdaten).
-// Beim Aufräumen nur eigene Caches (sd-*) löschen – das Sprachmodell liegt in "transformers-cache" und bleibt.
-const VERSION = 'sd-v17';
-const SHELL = ['./', 'index.html', 'css/app.css', 'js/app.js', 'js/config.js', 'js/auth.js', 'js/onedrive.js',
-  'js/anon.js', 'js/ai.js', 'js/speech.js', 'js/stats.js', 'js/report.js', 'lib/msal-browser.min.js', 'manifest.webmanifest',
+// Service Worker: App-Dateien für Offline-Nutzung zwischenspeichern und
+// Cross-Origin-Isolation setzen. Speichert KEINE Spieler- oder Feedbackdaten.
+// Aufräumen löscht nur eigene Caches (sd-*); das Sprachmodell liegt in "transformers-cache" und bleibt erhalten.
+importScripts('js/version.js');
+
+const VERSION = `sd-v${self.APP_VERSION}`;
+const SHELL = ['./', 'index.html', 'css/app.css', 'manifest.webmanifest', 'lib/msal-browser.min.js',
+  'js/main.js', 'js/version.js',
+  'js/core/config.js', 'js/core/state.js', 'js/core/format.js', 'js/core/stats.js', 'js/core/data.js',
+  'js/services/auth.js', 'js/services/onedrive.js', 'js/services/ai.js', 'js/services/speech.js', 'js/services/anon.js',
+  'js/ui/dom.js', 'js/ui/charts.js', 'js/ui/shell.js',
+  'js/views/capture.js', 'js/views/review.js', 'js/views/stats.js', 'js/views/settings.js',
   'assets/logo.png', 'assets/bg.webp', 'assets/leo.webp', 'assets/leo-head.webp', 'assets/icon-192.png'];
 
 self.addEventListener('install', e => {
@@ -12,7 +19,7 @@ self.addEventListener('activate', e => {
   e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k.startsWith('sd-') && k !== VERSION).map(k => caches.delete(k))))
     .then(() => self.clients.claim()));
 });
-// Netz zuerst, am HTTP-Cache vorbei (immer aktuelle Version), Cache als Rückfall ohne Verbindung. Nur eigene Dateien.
+
 // Seitenaufrufe bekommen Cross-Origin-Isolation (COOP/COEP), damit das Sprachmodell mehrere
 // Prozessorkerne nutzen darf. GitHub Pages kann diese Header nicht selbst setzen.
 function isolate(res) {
@@ -22,6 +29,8 @@ function isolate(res) {
   h.set('Cross-Origin-Embedder-Policy', 'credentialless');
   return new Response(res.body, { status: res.status, statusText: res.statusText, headers: h });
 }
+
+// Netz zuerst, am HTTP-Cache vorbei (immer aktuelle Version); Cache nur als Rückfall ohne Verbindung.
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
   if (e.request.method !== 'GET' || url.origin !== location.origin) return;

@@ -1,7 +1,7 @@
 // Zugriff auf OneDrive und die Excel-Datenbank über Microsoft Graph.
 // Excel-Struktur: Blatt "Feedback" (Tabelle "Feedback") + Konfigurationsblätter
 // "Spieler", "Kompetenzen", "Positionen" (einfache Bereiche mit Kopfzeile).
-import { CONFIG, settings } from './config.js';
+import { CONFIG, settings } from '../core/config.js';
 import { getToken } from './auth.js';
 
 const G = 'https://graph.microsoft.com/v1.0';

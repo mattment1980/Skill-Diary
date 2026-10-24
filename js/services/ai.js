@@ -1,7 +1,7 @@
 // KI-Aufrufe (Anthropic API, direkt aus dem Browser). Es werden nur pseudonymisierte Texte gesendet.
 // Strukturierte Antworten über ein "Tool", damit kein freies JSON geparst werden muss.
 // Manche Modelle erlauben kein erzwungenes Tool (tool_choice) – dann wird per Anweisung verpflichtet.
-import { settings } from './config.js';
+import { settings } from '../core/config.js';
 
 const noForcedTool = new Set(); // Modelle, die tool_choice "tool" ablehnen
 

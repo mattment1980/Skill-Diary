@@ -1,8 +1,8 @@
 // PowerPoint-Export (Entwicklungsgespräch) auf Basis von template/Auswertung-Vorlage.pptx.
 // Seite 1: Texte + Sterne je Bereich. Seite 2: Grafiken (Überblick, Niveau je Bereich, Verlauf, Niveau je Skill).
 // Alles wird auf dem Handy erzeugt; Texte bleiben in PowerPoint editierbar, Grafiken sind Bilder.
-import { CONFIG } from './config.js';
-import { bucketize, avgLevel, ratingCounts } from './stats.js';
+import { CONFIG } from '../core/config.js';
+import { bucketize, avgLevel, ratingCounts } from '../core/stats.js';
 
 const TEMPLATE = 'template/Auswertung-Vorlage.pptx';
 const STAR_FULL = 'rId3';  // ppt/media/image2.png (gefüllter Stern)

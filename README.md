@@ -19,21 +19,21 @@ App: https://mattment1980.github.io/Skill-Diary/
 
 ## Aufbau
 
-| Datei | Zweck |
-|---|---|
-| `index.html`, `css/app.css` | Oberfläche, dunkles Vereinsdesign |
-| `js/app.js` | Ansichten und Ablauf (Erfassen, Prüfen, Auswertung, Einstellungen) |
-| `js/config.js` | Konstanten (Client-ID, Spalten) und lokale Einstellungen |
-| `js/auth.js` | Microsoft-Anmeldung (MSAL, persönliches Konto) |
-| `js/onedrive.js` | Microsoft Graph: Excel lesen/schreiben, Dateien hochladen |
-| `js/anon.js` | Pseudonymisierung von Namen |
-| `js/ai.js` | Anthropic-API: Zuordnung (kleines Modell) und Zusammenfassung |
-| `js/speech.js` | Spracheingabe (Web Speech API, lokal bevorzugt) |
-| `js/stats.js` | Gemeinsame Berechnungen (Zeitabschnitte, Durchschnittsniveau) |
-| `js/report.js` | PowerPoint-Export: füllt `template/Auswertung-Vorlage.pptx`, zeichnet Grafiken |
-| `template/Skill-Diary-Vorlage.xlsx` | Leere Datenbank; wird angelegt, falls im OneDrive keine existiert |
-| `template/Auswertung-Vorlage.pptx` | Layout Entwicklungsgespräch mit Platzhaltern `{{…}}`, Sternen `STAR_<Bereich>_<n>` und Grafikflächen `CHART_*` |
-| `lib/` | Mitgelieferte Bibliotheken (MSAL, JSZip – MIT-Lizenz) |
+Statische Web-App ohne Build-Schritt (ES-Module). Struktur, Datenfluss, Konventionen und Release-Ablauf:
+**[docs/ARCHITEKTUR.md](docs/ARCHITEKTUR.md)**. Änderungen: [CHANGELOG.md](CHANGELOG.md).
+
+```
+js/main.js        Einstieg
+js/version.js     Versionsnummer (einzige Stelle)
+js/core/          Zustand, Datenabgleich, Berechnungen, Formate, Konfiguration
+js/services/      Microsoft-Anmeldung, OneDrive/Excel, KI, Spracheingabe, Anonymisierung
+js/ui/            DOM-Helfer, Rahmen, Diagramme
+js/views/         Erfassen, Prüfen, Auswertung, Einstellungen
+js/export/        PowerPoint-Export
+template/         Leere Datenbank, PowerPoint-Vorlage
+tools/            Skripte zum Erzeugen der Vorlagen
+tests/            npm test
+```
 
 ## Excel-Datenbank
 
@@ -50,4 +50,4 @@ App: https://mattment1980.github.io/Skill-Diary/
    Berechtigungen `Files.ReadWrite`, `offline_access`. Client-ID steht in `js/config.js`.
 3. In der App unter Einstellungen den Anthropic-Schlüssel eintragen.
 
-Nach Code-Änderungen in `sw.js` die `VERSION` erhöhen, damit Handys die neue Version laden.
+Nach Änderungen `APP_VERSION` in `js/version.js` erhöhen, damit Handys die neue Version laden (siehe Release in der Architektur-Doku).

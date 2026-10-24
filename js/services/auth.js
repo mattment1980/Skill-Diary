@@ -1,6 +1,6 @@
 // Microsoft-Anmeldung (MSAL, persönliches Microsoft-Konto).
 // Die Anmeldung bleibt im Browser gespeichert, damit nicht bei jedem Start neu angemeldet werden muss.
-import { CONFIG } from './config.js';
+import { CONFIG } from '../core/config.js';
 
 let app = null;
 

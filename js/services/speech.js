@@ -4,7 +4,7 @@
 // 3. Whisper im Browser (transformers.js): Aufnahme läuft lokal, Umwandlung in Text auf dem Handy.
 //    Das Modell wird einmalig von Hugging Face geladen und im Browser zwischengespeichert;
 //    dabei werden keine Audiodaten gesendet.
-import { settings } from './config.js';
+import { settings } from '../core/config.js';
 
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 const LANG = 'de-DE';
