@@ -1,0 +1,459 @@
+// Skill Diary – Oberfläche und Ablauf.
+// Ansichten: Erfassen -> Prüfen -> Speichern, Auswertung (inkl. Zusammenfassung/Word), Einstellungen.
+import { CONFIG, settings, saveSettings, load, save, today } from './config.js';
+import { initAuth, login, logout, accountName } from './auth.js';
+import * as od from './onedrive.js';
+import { anonymize, deanonymize } from './anon.js';
+import { extractFeedback, summarize } from './ai.js';
+import { startDictation, localStatus } from './speech.js';
+import { buildDocx } from './export.js';
+
+/* ---------- Zustand ---------- */
+const S = {
+  tab: 'capture',
+  cfg: load('sd.cfg', { players: [], skills: [], positions: [] }), // Kopie der Konfiguration für Offline-Nutzung
+  pending: load('sd.pending', []),     // noch nicht gespeicherte Zeilen (z. B. ohne Netz)
+  draft: load('sd.draft', { art: '', date: today(), anlass: '', text: '' }),
+  review: null,                         // aktuell zu prüfende Einträge
+  feedback: null,                       // geladene Feedback-Daten (nur im Speicher)
+  stats: { player: '', from: CONFIG.seasonStart, to: today(), area: '' },
+  summary: null,
+  busy: '',
+  dictation: null,
+};
+const saveDraft = () => save('sd.draft', S.draft);
+const savePending = () => save('sd.pending', S.pending);
+
+/* ---------- DOM-Helfer ---------- */
+function h(tag, attrs = {}, ...kids) {
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (v === false || v == null) continue;
+    if (k.startsWith('on')) el.addEventListener(k.slice(2), v);
+    else if (k === 'class') el.className = v;
+    else if (k === 'value') el.value = v;
+    else if (k === 'checked') el.checked = v;
+    else el.setAttribute(k, v === true ? '' : v);
+  }
+  for (const c of kids.flat()) if (c != null && c !== false) el.append(c.nodeType ? c : document.createTextNode(c));
+  return el;
+}
+const $ = sel => document.querySelector(sel);
+const uid = () => crypto.getRandomValues(new Uint32Array(2)).reduce((s, x) => s + x.toString(36), '').slice(0, 10);
+const fmtDate = iso => (iso ? iso.split('-').reverse().join('.') : 'ohne Datum');
+const firstName = n => n.split(' ')[0];
+/** Vorname; bei doppeltem Vornamen mit Nachnamen-Initial ("Luis Z."). */
+const displayName = p => {
+  const f = firstName(p.name);
+  const dup = S.cfg.players.filter(x => firstName(x.name) === f).length > 1;
+  return dup ? `${f} ${(p.name.split(' ')[1] || '').charAt(0)}.` : f;
+};
+const activePlayers = () => S.cfg.players.filter(p => p.active);
+const areas = () => [...new Set(S.cfg.skills.map(s => s.area))];
+const skillsOf = area => S.cfg.skills.filter(s => s.area === area).map(s => s.skill);
+const areaOfSkill = skill => S.cfg.skills.find(s => s.skill === skill)?.area || '';
+
+function toast(msg, kind = '') {
+  const t = h('div', { class: `toast ${kind}` }, msg);
+  $('#toasts').append(t);
+  setTimeout(() => t.remove(), kind === 'error' ? 6000 : 3000);
+}
+
+/** Auswahl-Dialog; liefert das gewählte Element oder null. */
+function choose(title, options, label) {
+  return new Promise(resolve => {
+    const close = v => { m.remove(); resolve(v); };
+    const m = h('div', { class: 'modal' }, h('div', { class: 'sheet' },
+      h('h3', {}, title),
+      ...options.map(o => h('button', { class: 'btn block', onclick: () => close(o) }, label(o))),
+      h('button', { class: 'btn ghost block', onclick: () => close(null) }, 'Keiner davon')));
+    document.body.append(m);
+  });
+}
+
+async function withBusy(msg, fn) {
+  S.busy = msg; render();
+  try { return await fn(); } catch (e) { console.error(e); toast(e.message || String(e), 'error'); } finally { S.busy = ''; render(); }
+}
+
+/* ---------- Synchronisation ---------- */
+async function syncConfig() {
+  await od.ensureWorkbook();
+  S.cfg = await od.readConfig();
+  save('sd.cfg', S.cfg);
+}
+
+async function flushPending() {
+  if (!S.pending.length) return;
+  await od.appendFeedback(S.pending);
+  const n = S.pending.length;
+  S.pending = []; savePending();
+  S.feedback = null;
+  toast(`${n} ausstehende Einträge nachgetragen`, 'ok');
+}
+
+/* ---------- Erfassen ---------- */
+function captureView() {
+  const d = S.draft;
+  const chip = (val) => h('button', {
+    class: `chip ${d.art === val ? 'on' : ''}`,
+    onclick: () => { d.art = d.art === val ? '' : val; saveDraft(); render(); },
+  }, val);
+  const ta = h('textarea', {
+    id: 'note', rows: 9, placeholder: 'Was ist dir aufgefallen? z. B. „Ferdi hat heute als LV super gescannt, Moritz muss am ersten Kontakt arbeiten …“',
+    value: d.text, oninput: e => { d.text = e.target.value; saveDraft(); },
+  });
+  const dict = S.dictation;
+  return h('section', { class: 'view capture' },
+    h('div', { class: 'card context' },
+      h('div', { class: 'row' }, chip('Spiel'), chip('Training'),
+        h('input', { type: 'date', value: d.date, onchange: e => { d.date = e.target.value; saveDraft(); } })),
+      h('input', { type: 'text', placeholder: 'Anlass / Gegner (optional – geht auch im Text)', value: d.anlass,
+        oninput: e => { d.anlass = e.target.value; saveDraft(); } })),
+    h('div', { class: 'card note' }, ta, h('div', { id: 'interim', class: 'interim' })),
+    h('div', { class: 'mic-wrap' },
+      h('button', { class: `mic ${dict ? 'rec' : ''}`, 'aria-label': 'Diktieren', onclick: toggleDictation },
+        h('span', { class: 'mic-icon' }, dict ? '■' : '🎙')),
+      h('div', { class: 'mic-hint' }, dict ? (dict.local ? 'Ich höre zu … (auf dem Gerät)' : 'Ich höre zu … (Cloud)') : 'Tippen zum Diktieren')),
+    h('div', { class: 'actions' },
+      h('button', { class: 'btn ghost', onclick: manualEntry }, 'Manuell'),
+      h('button', { class: 'btn primary', onclick: runAI }, 'KI zuordnen')),
+    !activePlayers().length && h('p', { class: 'hint' }, 'Noch keine Spieler geladen – unter Einstellungen prüfen.'));
+}
+
+async function toggleDictation() {
+  if (S.dictation) { S.dictation.stop(); S.dictation = null; render(); return; }
+  try {
+    S.dictation = await startDictation({
+      onText: t => {
+        S.draft.text = (S.draft.text ? S.draft.text.replace(/\s*$/, ' ') : '') + t;
+        saveDraft();
+        const ta = $('#note'); if (ta) { ta.value = S.draft.text; ta.scrollTop = ta.scrollHeight; }
+      },
+      onInterim: t => { const el = $('#interim'); if (el) el.textContent = t; },
+      onEnd: msg => { S.dictation = null; if (msg) toast(msg, 'error'); render(); },
+    });
+    render();
+  } catch (e) {
+    toast(e.message, 'error');
+    $('#note')?.focus(); // Tastatur öffnen, damit das Gboard-Mikrofon direkt erreichbar ist
+  }
+}
+
+const emptyEntry = (o = {}) => ({ id: uid(), player: null, area: '', skill: '', rating: '', position: '', comment: '', ...o });
+
+function manualEntry() {
+  S.dictation?.stop(); S.dictation = null;
+  const d = S.draft;
+  S.review = { kontext: { art: d.art, date: d.date, anlass: d.anlass }, entries: [emptyEntry({ comment: d.text.trim() })], source: 'manuell', sent: '' };
+  S.tab = 'review'; render();
+}
+
+async function runAI() {
+  const d = S.draft;
+  if (!d.text.trim()) return toast('Erst etwas diktieren oder eintippen.');
+  S.dictation?.stop(); S.dictation = null;
+  await withBusy('KI ordnet zu …', async () => {
+    const { text, codes } = await anonymize(d.text, activePlayers(),
+      (token, cands) => choose(`Welcher „${token}“ ist gemeint?`, cands, p => p.name));
+    if (!codes.size) toast('Kein Spielername erkannt – bitte Spieler in der Prüfung auswählen.');
+    const r = await extractFeedback({ text, codes, skills: S.cfg.skills, positions: S.cfg.positions, dateStr: `${today()} (${new Date().toLocaleDateString('de-DE', { weekday: 'long' })})` });
+    const k = r.kontext || {};
+    const entries = (r.eintraege || []).map(e => {
+      const skill = skillsOf(e.bereich).includes(e.skill) ? e.skill : (areaOfSkill(e.skill) ? e.skill : '');
+      return emptyEntry({
+        player: codes.get(e.spieler) || null,
+        skill, area: skill ? areaOfSkill(skill) : (areas().includes(e.bereich) ? e.bereich : ''),
+        rating: e.bewertung || '', position: e.position || '',
+        comment: deanonymize(e.kommentar, codes, displayName),
+      });
+    });
+    S.review = {
+      kontext: {
+        art: d.art || k.art || '',
+        date: (d.date !== today() ? d.date : (k.datum || d.date)),
+        anlass: d.anlass || k.anlass || '',
+      },
+      entries: entries.length ? entries : [emptyEntry({ comment: d.text.trim() })],
+      source: 'KI', sent: text,
+    };
+    S.tab = 'review';
+  });
+}
+
+/* ---------- Prüfen ---------- */
+function select(value, options, onchange, placeholder, optional = false) {
+  return h('select', { class: value || optional ? '' : 'missing', onchange: e => onchange(e.target.value) },
+    h('option', { value: '' }, placeholder),
+    ...options.map(o => {
+      const [v, l] = Array.isArray(o) ? o : [o, o];
+      return h('option', { value: v, selected: v === value }, l);
+    }));
+}
+
+function reviewView() {
+  const R = S.review;
+  const k = R.kontext;
+  const players = activePlayers();
+  const card = (e) => h('div', { class: 'card entry' },
+    h('div', { class: 'row' },
+      select(e.player?.name || '', players.map(p => p.name), v => { e.player = players.find(p => p.name === v) || null; render(); }, 'Spieler wählen'),
+      h('button', { class: 'icon-btn', 'aria-label': 'Eintrag entfernen', onclick: () => { R.entries = R.entries.filter(x => x !== e); render(); } }, '✕')),
+    h('div', { class: 'rating' }, ...CONFIG.ratings.map(r => h('button', {
+      class: `chip r-${r.toLowerCase()} ${e.rating === r ? 'on' : ''} ${e.rating ? '' : 'missing'}`,
+      onclick: () => { e.rating = r; render(); },
+    }, r))),
+    h('div', { class: 'row' },
+      select(e.area, areas(), v => { e.area = v; if (!skillsOf(v).includes(e.skill)) e.skill = ''; render(); }, 'Bereich'),
+      select(e.skill, skillsOf(e.area).length ? skillsOf(e.area) : S.cfg.skills.map(s => s.skill),
+        v => { e.skill = v; e.area = areaOfSkill(v); render(); }, 'Skill')),
+    select(e.position, S.cfg.positions.map(p => [p.code, `${p.code} – ${p.label || p.group}`]), v => { e.position = v; }, 'Position (optional)', true),
+    h('textarea', { rows: 3, value: e.comment, class: e.comment.trim() ? '' : 'missing', oninput: ev => { e.comment = ev.target.value; } }));
+
+  return h('section', { class: 'view review' },
+    h('div', { class: 'card context' },
+      h('div', { class: 'row' },
+        ...['Spiel', 'Training'].map(v => h('button', { class: `chip ${k.art === v ? 'on' : ''}`, onclick: () => { k.art = k.art === v ? '' : v; render(); } }, v)),
+        h('input', { type: 'date', value: k.date, onchange: ev => { k.date = ev.target.value; } })),
+      h('input', { type: 'text', placeholder: 'Anlass / Gegner', value: k.anlass, oninput: ev => { k.anlass = ev.target.value; } })),
+    R.entries.map(card),
+    h('button', { class: 'btn ghost block', onclick: () => { R.entries.push(emptyEntry()); render(); } }, '+ Eintrag hinzufügen'),
+    R.sent && h('details', { class: 'sent' }, h('summary', {}, 'An die KI gesendet (anonymisiert)'), h('pre', {}, R.sent)),
+    h('div', { class: 'actions sticky' },
+      h('button', { class: 'btn ghost', onclick: () => { S.review = null; S.tab = 'capture'; render(); } }, 'Zurück'),
+      h('button', { class: 'btn primary', onclick: saveReview }, `Speichern (${R.entries.length})`)));
+}
+
+async function saveReview() {
+  const R = S.review;
+  const bad = R.entries.find(e => !e.player || !e.skill || !e.rating || !e.comment.trim());
+  if (bad) return toast('Bitte bei allen Einträgen Spieler, Skill, Bewertung und Kommentar ausfüllen.', 'error');
+  const group = uid().slice(0, 6);
+  const now = new Date();
+  const stamp = `${today()} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+  const rows = R.entries.map(e => [uid(), stamp, R.kontext.date || '', R.kontext.art || '', R.kontext.anlass || '',
+    e.player.name, e.position || '', e.area, e.skill, e.rating, e.comment.trim(), R.source, group, '']);
+  S.pending.push(...rows); savePending();
+  S.review = null;
+  S.draft = { art: S.draft.art, date: today(), anlass: '', text: '' }; saveDraft();
+  S.tab = 'capture';
+  await withBusy('Speichere in OneDrive …', async () => {
+    try { await flushPending(); showSaved(rows.length); } catch (e) {
+      toast('Gerade nicht erreichbar – Einträge sind auf dem Handy vorgemerkt und werden nachgereicht.', 'error');
+    }
+  });
+}
+
+function showSaved(n) {
+  const m = h('div', { class: 'modal saved', onclick: () => m.remove() }, h('div', { class: 'sheet center' },
+    h('img', { src: 'assets/leo-head.webp', alt: '', class: 'leo-head' }),
+    h('h3', {}, `${n} ${n === 1 ? 'Eintrag' : 'Einträge'} gespeichert`),
+    h('p', {}, 'Stark! Weiter so, Coach.')));
+  document.body.append(m);
+  setTimeout(() => m.remove(), 1800);
+}
+
+/* ---------- Auswertung ---------- */
+function statsView() {
+  const st = S.stats;
+  const head = h('div', { class: 'card context' },
+    select(st.player, activePlayers().map(p => p.name), v => { st.player = v; S.summary = null; render(); }, 'Alle Spieler (Übersicht)', true),
+    h('div', { class: 'row' },
+      h('label', {}, 'von', h('input', { type: 'date', value: st.from, onchange: e => { st.from = e.target.value; S.summary = null; render(); } })),
+      h('label', {}, 'bis', h('input', { type: 'date', value: st.to, onchange: e => { st.to = e.target.value; S.summary = null; render(); } })),
+      h('button', { class: 'icon-btn', 'aria-label': 'Neu laden', onclick: () => { S.feedback = null; loadFeedback(); } }, '↻')));
+  if (!S.feedback) { loadFeedback(); return h('section', { class: 'view' }, head, h('p', { class: 'hint' }, 'Lade Daten …')); }
+  if (!st.player) return h('section', { class: 'view' }, head, overview());
+
+  const all = S.feedback.filter(f => f.Spieler === st.player && (!f.Datum || (f.Datum >= st.from && f.Datum <= st.to)))
+    .sort((a, b) => String(b.Datum).localeCompare(String(a.Datum)));
+  const list = st.area ? all.filter(f => f.Bereich === st.area) : all;
+  const count = (rows, r) => rows.filter(f => f.Bewertung === r).length;
+  const bar = rows => {
+    const t = rows.length || 1;
+    return h('div', { class: 'bar' }, ...CONFIG.ratings.map(r => {
+      const n = count(rows, r);
+      return n ? h('span', { class: `seg r-${r.toLowerCase()}`, style: `flex:${n / t}` }, n) : null;
+    }));
+  };
+  return h('section', { class: 'view stats' }, head,
+    h('div', { class: 'card' },
+      h('div', { class: 'totals' }, ...CONFIG.ratings.map(r => h('div', { class: `total r-${r.toLowerCase()}` }, h('b', {}, count(all, r)), r))),
+      ...areas().map(a => {
+        const rows = all.filter(f => f.Bereich === a);
+        return h('button', { class: `area-row ${st.area === a ? 'on' : ''}`, onclick: () => { st.area = st.area === a ? '' : a; render(); } },
+          h('span', { class: 'area-name' }, a, h('small', {}, ` ${rows.length}`)), bar(rows));
+      })),
+    S.summary ? summaryEditor() : h('button', { class: 'btn primary block', disabled: !all.length, onclick: () => makeSummary(all) }, 'Zusammenfassung erstellen'),
+    h('h3', { class: 'list-title' }, st.area ? `${st.area} (${list.length})` : `Alle Einträge (${list.length})`),
+    ...list.map(f => h('div', { class: `card fb r-${String(f.Bewertung).toLowerCase()}` },
+      h('div', { class: 'fb-meta' }, `${fmtDate(f.Datum)} · ${[f.Art, f.Anlass].filter(Boolean).join(' ') || '–'}${f.Position ? ' · ' + f.Position : ''}`),
+      h('div', { class: 'fb-skill' }, f.Skill, h('span', { class: 'tag' }, f.Bewertung)),
+      h('div', {}, f.Kommentar))));
+}
+
+function overview() {
+  const by = {};
+  for (const f of S.feedback) (by[f.Spieler] ||= []).push(f);
+  return h('div', { class: 'card' }, h('h3', {}, 'Einträge je Spieler'),
+    ...activePlayers().map(p => {
+      const rows = by[p.name] || [];
+      return h('button', { class: 'area-row', onclick: () => { S.stats.player = p.name; render(); } },
+        h('span', { class: 'area-name' }, p.name, h('small', {}, ` ${rows.length}`)),
+        h('div', { class: 'bar' }, ...CONFIG.ratings.map(r => {
+          const n = rows.filter(f => f.Bewertung === r).length;
+          return n ? h('span', { class: `seg r-${r.toLowerCase()}`, style: `flex:${n}` }, n) : null;
+        })));
+    }));
+}
+
+let loadingFb = false;
+async function loadFeedback() {
+  if (loadingFb) return;
+  loadingFb = true;
+  try { await od.ensureWorkbook(); S.feedback = await od.readFeedback(); } catch (e) { toast(e.message, 'error'); S.feedback = []; }
+  loadingFb = false; render();
+}
+
+async function makeSummary(rows) {
+  const player = S.cfg.players.find(p => p.name === S.stats.player);
+  await withBusy('Zusammenfassung wird geschrieben …', async () => {
+    const code = 'P-ICH';
+    const lines = [...rows].reverse().map(f => `${fmtDate(f.Datum)} | ${[f.Art, f.Anlass].filter(Boolean).join(' ') || '–'} | ${f.Bereich}/${f.Skill} | ${f.Bewertung} | ${String(f.Kommentar).replace(/\n/g, ' ')}`);
+    const { text } = await anonymize(lines.join('\n'), S.cfg.players,
+      async (_t, cands) => (cands.includes(player) ? player : null), { player, code });
+    const period = `${fmtDate(S.stats.from)} – ${fmtDate(S.stats.to)}`;
+    const r = await summarize({ code, lines: text.replace(/P-(?!ICH)[A-Z2-9]{3}/g, 'ein Mitspieler').split('\n'), period });
+    S.summary = { period, ...r };
+  });
+}
+
+function summaryEditor() {
+  const s = S.summary;
+  const words = t => (t.trim().match(/\S+/g) || []).length;
+  const listArea = (key, max) => h('textarea', {
+    rows: 5, value: s[key].join('\n'),
+    oninput: e => { s[key] = e.target.value.split('\n').map(x => x.trim()).filter(Boolean).slice(0, max); },
+  });
+  const counter = h('small', { class: 'counter' }, `${words(s.einschaetzung)}/100 Wörter`);
+  return h('div', { class: 'card summary' },
+    h('h3', {}, 'Unsere Einschätzung ', counter),
+    h('textarea', { rows: 6, value: s.einschaetzung, oninput: e => { s.einschaetzung = e.target.value; counter.textContent = `${words(e.target.value)}/100 Wörter`; } }),
+    h('h3', {}, 'Das machst du schon super'), h('small', { class: 'hint' }, 'Ein Punkt pro Zeile, max. 5'), listArea('super', 5),
+    h('h3', {}, 'Hier kannst du dich noch verbessern'), listArea('verbessern', 5),
+    h('h3', {}, 'Darauf kannst du stolz sein'),
+    ...s.stolz.map(b => h('div', { class: 'stolz' },
+      h('input', { type: 'text', value: b.titel, oninput: e => { b.titel = e.target.value; } }),
+      h('textarea', { rows: 3, value: b.text, oninput: e => { b.text = e.target.value; } }))),
+    h('div', { class: 'actions' },
+      h('button', { class: 'btn ghost', onclick: () => { S.summary = null; render(); } }, 'Verwerfen'),
+      h('button', { class: 'btn primary', onclick: exportWord }, 'Word exportieren')));
+}
+
+async function exportWord() {
+  const name = S.stats.player;
+  await withBusy('Erstelle Word-Datei …', async () => {
+    const blob = await buildDocx({ name, period: S.summary.period, summary: S.summary });
+    const file = `${name} - Entwicklungsfeedback ${today()}.docx`;
+    const a = h('a', { href: URL.createObjectURL(blob), download: file });
+    document.body.append(a); a.click(); a.remove();
+    await od.uploadFile(settings.exportFolder, file, blob);
+    toast('Word-Datei gespeichert (OneDrive „Exporte“ + Download)', 'ok');
+  });
+}
+
+/* ---------- Einstellungen ---------- */
+function settingsView() {
+  const cfg = S.cfg;
+  const field = (label, key, type = 'text') => h('label', { class: 'field' }, label,
+    h('input', { type, value: settings[key], onchange: e => saveSettings({ [key]: e.target.value.trim() }) }));
+  const rowsEditor = (title, list, cols, make) => h('div', { class: 'card' },
+    h('h3', {}, title),
+    ...list.map(item => h('div', { class: 'row edit' },
+      ...cols.map(([key, ph, kind]) => kind === 'check'
+        ? h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: item[key], onchange: e => { item[key] = e.target.checked; } }), ph)
+        : h('input', { type: 'text', placeholder: ph, value: kind === 'list' ? item[key].join(', ') : item[key],
+            oninput: e => { item[key] = kind === 'list' ? e.target.value.split(/[,;]/).map(s => s.trim()).filter(Boolean) : e.target.value; } })),
+      h('button', { class: 'icon-btn', 'aria-label': 'Entfernen', onclick: () => { list.splice(list.indexOf(item), 1); render(); } }, '✕'))),
+    h('button', { class: 'btn ghost block', onclick: () => { list.push(make()); render(); } }, '+ hinzufügen'));
+
+  return h('section', { class: 'view settings' },
+    h('div', { class: 'card' }, h('h3', {}, 'Konto'),
+      h('p', {}, accountName()),
+      h('button', { class: 'btn ghost', onclick: logout }, 'Abmelden')),
+    h('div', { class: 'card' }, h('h3', {}, 'KI'),
+      field('Anthropic-Schlüssel (bleibt nur auf diesem Handy)', 'apiKey', 'password'),
+      field('Modell Zuordnung', 'modelExtract'),
+      field('Modell Zusammenfassung', 'modelSummary')),
+    h('div', { class: 'card' }, h('h3', {}, 'OneDrive'),
+      field('Ordner Datenbank', 'folder'),
+      field('Ordner Exporte', 'exportFolder')),
+    h('div', { class: 'card' }, h('h3', {}, 'Spracheingabe'),
+      h('p', { id: 'speech-status', class: 'hint' }, 'Status unbekannt'),
+      h('button', { class: 'btn ghost', onclick: async () => { $('#speech-status').textContent = 'Prüfe …'; const st = await localStatus(); $('#speech-status').textContent = ({ available: 'Lokale Erkennung verfügbar ✓', downloading: 'Sprachpaket wird geladen …', unavailable: 'Lokal nicht verfügbar', unsupported: 'Browser unterstützt keine Spracheingabe', unknown: 'Lokale Erkennung nicht prüfbar (älteres Chrome)' })[st] || st; } }, 'Lokale Erkennung prüfen'),
+      h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: settings.allowCloudSpeech, onchange: e => saveSettings({ allowCloudSpeech: e.target.checked }) }),
+        'Cloud-Erkennung (Google) erlauben, falls lokal nicht verfügbar – Namen verlassen dann das Gerät')),
+    rowsEditor('Spieler', cfg.players, [['name', 'Name'], ['aliases', 'Spitznamen, …', 'list'], ['active', 'aktiv', 'check']],
+      () => ({ name: '', aliases: [], active: true })),
+    rowsEditor('Kompetenzen', cfg.skills, [['area', 'Bereich'], ['skill', 'Skill']], () => ({ area: '', skill: '' })),
+    rowsEditor('Positionen', cfg.positions, [['group', 'Gruppe'], ['code', 'Kürzel'], ['label', 'Bezeichnung']], () => ({ group: '', code: '', label: '' })),
+    h('div', { class: 'actions sticky' },
+      h('button', { class: 'btn ghost', onclick: () => withBusy('Lade aus OneDrive …', syncConfig) }, 'Neu laden'),
+      h('button', { class: 'btn primary', onclick: saveConfig }, 'Speichern')));
+}
+
+async function saveConfig() {
+  const cfg = S.cfg;
+  cfg.players = cfg.players.filter(p => p.name.trim()).map(p => ({ ...p, name: p.name.trim() }));
+  cfg.skills = cfg.skills.filter(s => s.area.trim() && s.skill.trim());
+  cfg.positions = cfg.positions.filter(p => p.code.trim());
+  await withBusy('Speichere Einstellungen …', async () => {
+    await od.ensureWorkbook(); await od.writeConfig(cfg); save('sd.cfg', cfg); toast('Gespeichert', 'ok');
+  });
+}
+
+/* ---------- Rahmen ---------- */
+function render() {
+  const app = $('#app');
+  const views = { capture: captureView, review: reviewView, stats: statsView, settings: settingsView };
+  const tab = (id, label, icon) => h('button', { class: `tab ${S.tab === id || (id === 'capture' && S.tab === 'review') ? 'on' : ''}`, onclick: () => { S.tab = id === 'capture' && S.review ? 'review' : id; render(); } },
+    h('span', { class: 'tab-icon' }, icon), label);
+  const scroll = window.scrollY;
+  app.replaceChildren(...[
+    h('header', { class: 'top' },
+      h('img', { src: 'assets/logo.png', alt: '', class: 'logo' }),
+      h('div', { class: 'title' }, h('b', {}, 'Skill Diary'), h('small', {}, S.tab === 'review' ? 'Einträge prüfen' : 'Spieler-Feedback')),
+      S.pending.length ? h('button', { class: 'pending', onclick: () => withBusy('Trage nach …', flushPending) }, `${S.pending.length} ausstehend ↻`) : null),
+    S.tab === 'capture' && h('div', { class: 'hero' },
+      h('img', { src: 'assets/leo-head.webp', alt: 'Leo', class: 'leo-head' }),
+      h('div', { class: 'bubble' }, S.draft.text ? 'Gut mitgeschrieben! Dann ab zur Zuordnung.' : 'Na Coach, wer ist dir heute aufgefallen?')),
+    views[S.tab](),
+    S.busy && h('div', { class: 'busy' }, h('div', { class: 'spinner' }), S.busy),
+    h('nav', { class: 'tabs' }, tab('capture', 'Erfassen', '✎'), tab('stats', 'Auswertung', '▤'), tab('settings', 'Einstellungen', '⚙')),
+  ].filter(Boolean));
+  if (S.tab !== 'capture') window.scrollTo(0, scroll);
+}
+
+function loginView() {
+  $('#app').replaceChildren(h('section', { class: 'login' },
+    h('img', { src: 'assets/logo.png', alt: '', class: 'logo big' }),
+    h('h1', {}, 'Skill Diary'),
+    h('img', { src: 'assets/leo.webp', alt: 'Leo', class: 'leo' }),
+    h('button', { class: 'btn primary block', onclick: login }, 'Mit Microsoft anmelden'),
+    h('p', { class: 'hint' }, 'Deine Daten liegen ausschließlich in deinem OneDrive.')));
+}
+
+async function start() {
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+  let signedIn = false;
+  try { signedIn = await initAuth(); } catch (e) { console.error(e); toast(`Anmeldung: ${e.message}`, 'error'); }
+  if (!signedIn) return loginView();
+  render();
+  try {
+    await syncConfig();
+    await flushPending();
+  } catch (e) { toast(e.message, 'error'); }
+  render();
+}
+
+start();
