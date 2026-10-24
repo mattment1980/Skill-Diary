@@ -6,9 +6,9 @@ import * as od from './onedrive.js';
 import { anonymize, deanonymize } from './anon.js';
 import { extractFeedback, summarize } from './ai.js';
 import { startDictation, localStatus, loadWhisper, whisperCached, WHISPER_MODELS, WHISPER_DEVICES } from './speech.js';
-import { buildDocx } from './export.js';
+import { buildPptx } from './report.js';
 
-const APP_VERSION = '15';
+const APP_VERSION = '16';
 
 /* ---------- Zustand ---------- */
 const S = {
@@ -573,18 +573,32 @@ function summaryEditor() {
       h('textarea', { rows: 3, value: b.text, oninput: e => { b.text = e.target.value; } }))),
     h('div', { class: 'actions' },
       h('button', { class: 'btn ghost', onclick: () => { S.summary = null; render(); } }, 'Verwerfen'),
-      h('button', { class: 'btn primary', onclick: exportWord }, 'Word exportieren')));
+      h('button', { class: 'btn primary', onclick: exportPptx }, 'PowerPoint exportieren')));
 }
 
-async function exportWord() {
-  const name = S.stats.player;
-  await withBusy('Erstelle Word-Datei …', async () => {
-    const blob = await buildDocx({ name, period: S.summary.period, summary: S.summary });
-    const file = `${name} - Entwicklungsfeedback ${today()}.docx`;
+/** Zeitraum kurz wie in der Vorlage: "Jul – Okt 2026" bzw. "Nov 2026 – Feb 2027". */
+function shortPeriod(from, to) {
+  const M = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
+  const [fy, fm] = [from.slice(0, 4), M[+from.slice(5, 7) - 1]], [ty, tm] = [to.slice(0, 4), M[+to.slice(5, 7) - 1]];
+  if (fy === ty) return fm === tm ? `${tm} ${ty}` : `${fm} – ${tm} ${ty}`;
+  return `${fm} ${fy} – ${tm} ${ty}`;
+}
+
+async function exportPptx() {
+  const name = S.stats.player, st = S.stats;
+  const inRange = f => !f.Datum || (f.Datum >= st.from && f.Datum <= st.to);
+  await withBusy('Erstelle PowerPoint …', async () => {
+    const blob = await buildPptx({
+      name, period: shortPeriod(st.from, st.to), from: st.from, to: st.to, summary: S.summary,
+      rows: S.feedback.filter(f => f.Spieler === name && inRange(f)),
+      teamRows: S.feedback.filter(inRange),
+      areas: areas(), skills: S.cfg.skills,
+    });
+    const file = `${name} - Entwicklungsgespräch ${today()}.pptx`;
     const a = h('a', { href: URL.createObjectURL(blob), download: file });
     document.body.append(a); a.click(); a.remove();
     await od.uploadFile(settings.exportFolder, file, blob);
-    toast('Word-Datei gespeichert (OneDrive „Exporte“ + Download)', 'ok');
+    toast('PowerPoint gespeichert (OneDrive „Exporte“ + Download)', 'ok');
   });
 }
 

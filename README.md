@@ -2,8 +2,8 @@
 
 Web-App (Android/Chrome, als App installierbar) zum Erfassen von Spieler-Feedback im Jugendfußball:
 diktieren oder tippen → KI ordnet Spieler, Kompetenzbereich, Skill, Bewertung und Position zu → prüfen →
-Ablage als Zeilen in einer Excel-Datei im eigenen OneDrive. Dazu Auswertung je Spieler und eine
-KI-Zusammenfassung als Word-Datei.
+Ablage als Zeilen in einer Excel-Datei im eigenen OneDrive. Dazu Auswertung je Spieler (Verlauf, Niveau je Bereich/Skill) und ein
+Entwicklungsgespräch als PowerPoint (KI-Zusammenfassung + Grafiken, im Vereinslayout).
 
 App: https://mattment1980.github.io/Skill-Diary/
 
@@ -29,15 +29,17 @@ App: https://mattment1980.github.io/Skill-Diary/
 | `js/anon.js` | Pseudonymisierung von Namen |
 | `js/ai.js` | Anthropic-API: Zuordnung (kleines Modell) und Zusammenfassung |
 | `js/speech.js` | Spracheingabe (Web Speech API, lokal bevorzugt) |
-| `js/export.js` | Word-Export (docx) |
+| `js/stats.js` | Gemeinsame Berechnungen (Zeitabschnitte, Durchschnittsniveau) |
+| `js/report.js` | PowerPoint-Export: füllt `template/Auswertung-Vorlage.pptx`, zeichnet Grafiken |
 | `template/Skill-Diary-Vorlage.xlsx` | Leere Datenbank; wird angelegt, falls im OneDrive keine existiert |
-| `lib/` | Mitgelieferte Bibliotheken (MSAL, docx – MIT-Lizenz) |
+| `template/Auswertung-Vorlage.pptx` | Layout Entwicklungsgespräch mit Platzhaltern `{{…}}`, Sternen `STAR_<Bereich>_<n>` und Grafikflächen `CHART_*` |
+| `lib/` | Mitgelieferte Bibliotheken (MSAL, JSZip – MIT-Lizenz) |
 
 ## Excel-Datenbank
 
 - **Feedback** (Tabelle `Feedback`): ID, Zeitstempel, Datum, Art (Spiel/Training), Anlass, Spieler, Position,
   Bereich, Skill, Bewertung (Positiv/Neutral/Kritisch), Kommentar, Quelle (KI/manuell/Migration),
-  Gruppe (verbindet Einträge aus einer Notiz), VideoLink (für später).
+  Gruppe (verbindet Einträge aus einer Notiz), VideoLink (für später), Niveau (1–5 im Altersvergleich, 3 = altersgemäß).
 - **Spieler** (Name, Aliase, Aktiv), **Kompetenzen** (Bereich, Skill), **Positionen** (Gruppe, Position, Bezeichnung) –
   in der App unter Einstellungen bearbeitbar oder direkt in Excel.
 
