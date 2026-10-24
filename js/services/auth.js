@@ -41,15 +41,36 @@ export function accountName() {
   return app?.getActiveAccount()?.username || '';
 }
 
-/** Holt ein Zugriffstoken für Microsoft Graph; meldet bei Bedarf neu an. */
+/**
+ * Fehler, bei denen eine sichtbare Anmeldung nötig ist. Neben InteractionRequired gehören dazu die
+ * Zeitüberschreitungen der unsichtbaren Anmeldung im versteckten Fenster: Die ist durch die
+ * Cross-Origin-Isolation (sw.js, für die schnelle Spracherkennung) blockiert.
+ */
+function needsInteraction(e) {
+  if (e instanceof msal.InteractionRequiredAuthError) return true;
+  return /monitor_window_timeout|timed_out|block_iframe|no_tokens_found|login_required|consent_required|interaction_required/i
+    .test(`${e?.errorCode || ''} ${e?.message || ''}`);
+}
+
+let redirecting = false;
+
+/** Holt ein Zugriffstoken für Microsoft Graph; leitet bei Bedarf zur Microsoft-Anmeldung weiter. */
 export async function getToken() {
   const account = app.getActiveAccount();
   try {
     const r = await app.acquireTokenSilent({ scopes: CONFIG.scopes, account });
     return r.accessToken;
   } catch (e) {
-    if (e instanceof msal.InteractionRequiredAuthError) {
-      await app.acquireTokenRedirect({ scopes: CONFIG.scopes, account });
+    if (needsInteraction(e)) {
+      // Schutz vor Endlosschleife: höchstens eine Weiterleitung pro Minute
+      let last = 0;
+      try { last = Number(sessionStorage.getItem('sd.authRedirect') || 0); } catch { /* */ }
+      if (!redirecting && Date.now() - last > 60000) {
+        redirecting = true;
+        try { sessionStorage.setItem('sd.authRedirect', String(Date.now())); } catch { /* */ }
+        await app.acquireTokenRedirect({ scopes: CONFIG.scopes, account });
+      }
+      throw new Error('Microsoft-Anmeldung erforderlich – bitte App neu öffnen.');
     }
     throw e;
   }

@@ -1,5 +1,8 @@
 # Changelog
 
+## 21 – 24.10.2026
+- Anmeldung: Zeitüberschreitung der unsichtbaren Anmeldung führt jetzt zur Microsoft-Anmeldeseite (statt Fehlermeldung)
+
 ## 20 – 24.10.2026
 - Zugriff nur noch auf den App-Ordner `OneDrive/Apps/Skill Diary` (Berechtigung `Files.ReadWrite.AppFolder`)
 - Ordnerangaben relativ zum App-Ordner (`Datenbank`, `Exporte`); alte Pfade werden automatisch umgestellt
