@@ -5,7 +5,7 @@ import { initAuth, login, logout, accountName } from './auth.js';
 import * as od from './onedrive.js';
 import { anonymize, deanonymize } from './anon.js';
 import { extractFeedback, summarize } from './ai.js';
-import { startDictation, localStatus } from './speech.js';
+import { startDictation, localStatus, loadWhisper, WHISPER_MODELS } from './speech.js';
 import { buildDocx } from './export.js';
 
 /* ---------- Zustand ---------- */
@@ -114,36 +114,69 @@ function captureView() {
     h('div', { class: 'mic-wrap' },
       h('button', { class: `mic ${dict ? 'rec' : ''}`, 'aria-label': 'Diktieren', onclick: toggleDictation },
         h('span', { class: 'mic-icon' }, dict ? '■' : '🎙')),
-      h('div', { class: 'mic-hint' }, dict ? (dict.local ? 'Ich höre zu … (auf dem Gerät)' : 'Ich höre zu … (Cloud)') : 'Tippen zum Diktieren')),
+      h('div', { id: 'mic-hint', class: 'mic-hint' }, dict ? micLabel() : 'Tippen zum Diktieren')),
     h('div', { class: 'actions' },
       h('button', { class: 'btn ghost', onclick: manualEntry }, 'Manuell'),
       h('button', { class: 'btn primary', onclick: runAI }, 'KI zuordnen')),
     !activePlayers().length && h('p', { class: 'hint' }, 'Noch keine Spieler geladen – unter Einstellungen prüfen.'));
 }
 
+let recTimer = null;
+function micLabel() {
+  const d = S.dictation;
+  if (!d) return 'Tippen zum Diktieren';
+  if (d.mode !== 'whisper') return d.mode === 'local' ? 'Ich höre zu … (auf dem Gerät)' : 'Ich höre zu … (Cloud)';
+  const sec = Math.round((Date.now() - d.started) / 1000);
+  return `Aufnahme ${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')} – zum Beenden tippen`;
+}
+
+/** Zeigt Fortschritt (Modell-Download, Umwandlung) im Ladefenster bzw. unter dem Textfeld. */
+function speechStatus(msg) {
+  if (S.busy) { S.busy = msg; const el = $('.busy-msg'); if (el) el.textContent = msg; }
+  else { const el = $('#interim'); if (el) el.textContent = msg; }
+}
+
+/** Beendet eine laufende Aufnahme; bei Whisper wird gewartet, bis der Text da ist. */
+async function stopDictation() {
+  const d = S.dictation;
+  if (!d) return;
+  clearInterval(recTimer);
+  if (d.mode === 'whisper') {
+    S.busy = 'Sprache wird umgewandelt …'; render();
+    try { await d.stop(); } finally { S.busy = ''; S.dictation = null; render(); }
+  } else { d.stop(); S.dictation = null; render(); }
+}
+
 async function toggleDictation() {
-  if (S.dictation) { S.dictation.stop(); S.dictation = null; render(); return; }
+  if (S.dictation) return stopDictation();
   try {
-    S.dictation = await startDictation({
+    const d = await startDictation({
       onText: t => {
         S.draft.text = (S.draft.text ? S.draft.text.replace(/\s*$/, ' ') : '') + t;
         saveDraft();
         const ta = $('#note'); if (ta) { ta.value = S.draft.text; ta.scrollTop = ta.scrollHeight; }
       },
       onInterim: t => { const el = $('#interim'); if (el) el.textContent = t; },
-      onEnd: msg => { S.dictation = null; if (msg) toast(msg, 'error'); render(); },
+      onStatus: speechStatus,
+      onEnd: msg => {
+        if (S.dictation?.mode !== 'whisper') { S.dictation = null; render(); }
+        const el = $('#interim'); if (el) el.textContent = '';
+        if (msg) toast(msg, 'error');
+      },
     });
+    S.dictation = { ...d, stop: d.stop, started: Date.now() };
+    clearInterval(recTimer);
+    if (d.mode === 'whisper') recTimer = setInterval(() => { const el = $('#mic-hint'); if (el) el.textContent = micLabel(); }, 1000);
     render();
   } catch (e) {
     toast(e.message, 'error');
-    $('#note')?.focus(); // Tastatur öffnen, damit das Gboard-Mikrofon direkt erreichbar ist
   }
 }
 
 const emptyEntry = (o = {}) => ({ id: uid(), player: null, area: '', skill: '', rating: '', position: '', comment: '', ...o });
 
-function manualEntry() {
-  S.dictation?.stop(); S.dictation = null;
+async function manualEntry() {
+  await stopDictation();
   const d = S.draft;
   S.review = { kontext: { art: d.art, date: d.date, anlass: d.anlass }, entries: [emptyEntry({ comment: d.text.trim() })], source: 'manuell', sent: '' };
   S.tab = 'review'; render();
@@ -151,8 +184,8 @@ function manualEntry() {
 
 async function runAI() {
   const d = S.draft;
+  await stopDictation();
   if (!d.text.trim()) return toast('Erst etwas diktieren oder eintippen.');
-  S.dictation?.stop(); S.dictation = null;
   await withBusy('KI ordnet zu …', async () => {
     const { text, codes } = await anonymize(d.text, activePlayers(),
       (token, cands) => choose(`Welcher „${token}“ ist gemeint?`, cands, p => p.name));
@@ -389,10 +422,15 @@ function settingsView() {
       field('Ordner Datenbank', 'folder'),
       field('Ordner Exporte', 'exportFolder')),
     h('div', { class: 'card' }, h('h3', {}, 'Spracheingabe'),
-      h('p', { id: 'speech-status', class: 'hint' }, 'Status unbekannt'),
-      h('button', { class: 'btn ghost', onclick: async () => { $('#speech-status').textContent = 'Prüfe …'; const st = await localStatus(); $('#speech-status').textContent = ({ available: 'Lokale Erkennung verfügbar ✓', downloading: 'Sprachpaket wird geladen …', unavailable: 'Lokal nicht verfügbar', unsupported: 'Browser unterstützt keine Spracheingabe', unknown: 'Lokale Erkennung nicht prüfbar (älteres Chrome)' })[st] || st; } }, 'Lokale Erkennung prüfen'),
+      h('p', { class: 'hint' }, 'Der Aufnahme-Button nutzt die Erkennung direkt auf dem Gerät. Ist die Chrome-eigene nicht verfügbar, wandelt ein Sprachmodell (Whisper) die Aufnahme auf dem Handy in Text um – ohne Upload.'),
+      h('label', { class: 'field' }, 'Sprachmodell',
+        h('select', { onchange: e => saveSettings({ whisperModel: e.target.value }) },
+          ...Object.entries(WHISPER_MODELS).map(([v, l]) => h('option', { value: v, selected: (settings.whisperModel || Object.keys(WHISPER_MODELS)[0]) === v }, l)))),
+      h('button', { class: 'btn ghost', onclick: () => withBusy('Sprachmodell wird geladen …', async () => { await loadWhisper(p => speechStatus(`Sprachmodell wird geladen … ${p}%`)); toast('Sprachmodell bereit ✓', 'ok'); }) }, 'Sprachmodell jetzt laden (WLAN)'),
+      h('p', { id: 'speech-status', class: 'hint' }, ''),
+      h('button', { class: 'btn ghost', onclick: async () => { $('#speech-status').textContent = 'Prüfe …'; const st = await localStatus(); $('#speech-status').textContent = ({ available: 'Chrome-Erkennung auf dem Gerät verfügbar ✓ (Live-Text)', downloading: 'Chrome lädt das Sprachpaket …', unavailable: 'Chrome-Erkennung lokal nicht verfügbar – Whisper wird genutzt', unsupported: 'Keine Chrome-Erkennung – Whisper wird genutzt', unknown: 'Chrome-Erkennung lokal nicht verfügbar – Whisper wird genutzt' })[st] || st; } }, 'Chrome-Erkennung prüfen'),
       h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: settings.allowCloudSpeech, onchange: e => saveSettings({ allowCloudSpeech: e.target.checked }) }),
-        'Cloud-Erkennung (Google) erlauben, falls lokal nicht verfügbar – Namen verlassen dann das Gerät')),
+        'Statt Whisper Cloud-Erkennung (Google) nutzen – Namen verlassen dann das Gerät')),
     rowsEditor('Spieler', cfg.players, [['name', 'Name'], ['aliases', 'Spitznamen, …', 'list'], ['active', 'aktiv', 'check']],
       () => ({ name: '', aliases: [], active: true })),
     rowsEditor('Kompetenzen', cfg.skills, [['area', 'Bereich'], ['skill', 'Skill']], () => ({ area: '', skill: '' })),
@@ -428,7 +466,7 @@ function render() {
       h('img', { src: 'assets/leo-head.webp', alt: 'Leo', class: 'leo-head' }),
       h('div', { class: 'bubble' }, S.draft.text ? 'Gut mitgeschrieben! Dann ab zur Zuordnung.' : 'Na Coach, wer ist dir heute aufgefallen?')),
     views[S.tab](),
-    S.busy && h('div', { class: 'busy' }, h('div', { class: 'spinner' }), S.busy),
+    S.busy && h('div', { class: 'busy' }, h('div', { class: 'spinner' }), h('span', { class: 'busy-msg' }, S.busy)),
     h('nav', { class: 'tabs' }, tab('capture', 'Erfassen', '✎'), tab('stats', 'Auswertung', '▤'), tab('settings', 'Einstellungen', '⚙')),
   ].filter(Boolean));
   if (S.tab !== 'capture') window.scrollTo(0, scroll);

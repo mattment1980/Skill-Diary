@@ -1,5 +1,5 @@
 // Service Worker: speichert nur die App-Dateien zwischen (keine Spieler- oder Feedbackdaten).
-const VERSION = 'sd-v2';
+const VERSION = 'sd-v3';
 const SHELL = ['./', 'index.html', 'css/app.css', 'js/app.js', 'js/config.js', 'js/auth.js', 'js/onedrive.js',
   'js/anon.js', 'js/ai.js', 'js/speech.js', 'js/export.js', 'lib/msal-browser.min.js', 'manifest.webmanifest',
   'assets/logo.png', 'assets/bg.webp', 'assets/leo.webp', 'assets/leo-head.webp', 'assets/icon-192.png'];
