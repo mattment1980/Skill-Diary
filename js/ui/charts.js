@@ -4,12 +4,12 @@ import { CONFIG } from '../core/config.js';
 import { S, areas, skillsOf, inStatsRange } from '../core/state.js';
 import { firstName } from '../core/format.js';
 import { bucketize, avgLevel } from '../core/stats.js';
-import { h, render } from './dom.js';
+import { h, render, esc } from './dom.js';
 
 const fmt1 = v => v.toFixed(1).replace('.', ',');
 const svgBox = (cls, W, H, svg, label) => {
   const el = h('div', { class: cls });
-  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${label}">${svg}</svg>`;
+  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(label)}">${svg}</svg>`;
   return el;
 };
 
@@ -56,7 +56,7 @@ export function radar(rows, playerName) {
     svg += `<line x1="${cx}" y1="${cy}" x2="${x}" y2="${y}" class="rd-grid"/>`;
     const [lx, ly] = pt(i, 5.75);
     const anchor = Math.abs(lx - cx) < 5 ? 'middle' : lx > cx ? 'start' : 'end';
-    svg += `<text x="${lx}" y="${ly}" text-anchor="${anchor}" class="rd-l">${a.split(' / ')[0]}</text>`;
+    svg += `<text x="${lx}" y="${ly}" text-anchor="${anchor}" class="rd-l">${esc(a.split(' / ')[0])}</text>`;
     svg += `<text x="${lx}" y="${ly + 13}" text-anchor="${anchor}" class="rd-v">${me[i] ? fmt1(me[i].val) : '–'}</text>`;
   });
   if (team.some(Boolean)) svg += `<polygon points="${poly(team)}" class="rd-team"/>`;
@@ -90,11 +90,11 @@ export function timeline(rows, area) {
       if (!n) return;
       const hgt = n * scale;
       y -= hgt;
-      svg += `<rect x="${x}" y="${y}" width="${bw}" height="${hgt}" rx="2" fill="${colors[k]}"><title>${b.label}: ${n} ${CONFIG.ratings[k]}</title></rect>`;
+      svg += `<rect x="${x}" y="${y}" width="${bw}" height="${hgt}" rx="2" fill="${colors[k]}"><title>${esc(b.label)}: ${n} ${esc(CONFIG.ratings[k])}</title></rect>`;
       if (hgt >= 12) svg += `<text x="${x + bw / 2}" y="${y + hgt / 2 + 4}" text-anchor="middle" class="tl-n">${n}</text>`;
     });
     if (b.total) svg += `<text x="${x + bw / 2}" y="${y - 3}" text-anchor="middle" class="tl-t">${b.total}</text>`;
-    if (!weekly || buckets.length <= 8 || i % 2 === 0) svg += `<text x="${x + bw / 2}" y="${H - 6}" text-anchor="middle" class="tl-l">${b.label}</text>`;
+    if (!weekly || buckets.length <= 8 || i % 2 === 0) svg += `<text x="${x + bw / 2}" y="${H - 6}" text-anchor="middle" class="tl-l">${esc(b.label)}</text>`;
   });
   svg += `<line x1="0" x2="${W}" y1="${H - bottom}" y2="${H - bottom}" class="tl-axis"/>`;
   return card(svgBox('timeline', W, H, svg, 'Verlauf der Bewertungen'),

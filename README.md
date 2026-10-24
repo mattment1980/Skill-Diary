@@ -10,12 +10,13 @@ App: https://mattment1980.github.io/Skill-Diary/
 ## Datenschutz
 
 - Spieler- und Feedbackdaten liegen **nur im OneDrive** (`Skill-Diary.xlsx`). Im Repo stehen keine Personendaten.
-- Vor jedem KI-Aufruf werden Namen **auf dem Handy** durch zufällige Codes ersetzt (`js/anon.js`);
-  die Zuordnung existiert nur im Arbeitsspeicher. Bei doppeldeutigen Vornamen fragt die App nach.
-- Spracheingabe nutzt bevorzugt die **lokale** Erkennung von Chrome. Cloud-Erkennung nur, wenn in den
-  Einstellungen ausdrücklich erlaubt.
-- Auf dem Handy zwischengespeichert: KI-Schlüssel, Einstellungen, Spielerliste (für die Anonymisierung ohne Netz),
-  der aktuelle Entwurf und noch nicht hochgeladene Einträge (werden nach dem Upload gelöscht).
+- Vor jedem KI-Aufruf werden Namen **auf dem Handy** durch zufällige Codes ersetzt; der anonymisierte Text wird
+  vor dem Senden angezeigt und kann bearbeitet werden.
+- Spracheingabe läuft **auf dem Gerät** (Chrome lokal oder Whisper im Browser). Cloud-Erkennung nur nach Einstellung.
+- Kein fremder Code zur Laufzeit; eine Content Security Policy begrenzt Verbindungen auf Microsoft, Anthropic
+  und Hugging Face (nur Modelldaten).
+- Abmelden löscht alle Daten der App auf dem Handy. Exporte landen nur auf Wunsch zusätzlich in den Downloads.
+- Details und bekannte Restrisiken: [docs/ARCHITEKTUR.md](docs/ARCHITEKTUR.md#sicherheit-und-datenschutz).
 
 ## Aufbau
 
@@ -47,7 +48,7 @@ tests/            npm test
 
 1. GitHub Pages: Settings → Pages → Branch `main`, Ordner `/ (root)`.
 2. Azure App-Registrierung (SPA), Redirect-URI `https://mattment1980.github.io/Skill-Diary/`,
-   Berechtigungen `Files.ReadWrite`, `offline_access`. Client-ID steht in `js/config.js`.
+   Berechtigungen `Files.ReadWrite`, `offline_access`. Client-ID steht in `js/core/config.js`.
 3. In der App unter Einstellungen den Anthropic-Schlüssel eintragen.
 
 Nach Änderungen `APP_VERSION` in `js/version.js` erhöhen, damit Handys die neue Version laden (siehe Release in der Architektur-Doku).

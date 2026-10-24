@@ -1,5 +1,13 @@
 # Changelog
 
+## 19 – 24.10.2026 (Sicherheit & Datenschutz)
+- Vorschau des anonymisierten Texts vor dem Senden an die KI (bearbeitbar, abschaltbar)
+- Whisper-Bibliothek und ONNX-Laufzeit fest im Repo statt von jsDelivr
+- Content Security Policy und `no-referrer`
+- Abmelden löscht alle lokalen App-Daten inkl. KI-Schlüssel (mit Warnung bei ausstehenden Einträgen)
+- PowerPoint-Download aufs Handy nur noch auf Wunsch (Standard: nur OneDrive)
+- Texte aus dem Excel in Diagrammen maskiert; neutrale Namen in Tests und Beispieltexten
+
 ## 18 – 24.10.2026
 - Code neu strukturiert: `core/`, `services/`, `ui/`, `views/`, `export/`; `app.js` aufgeteilt
 - Versionsnummer an einer Stelle (`js/version.js`), Service Worker als Modul

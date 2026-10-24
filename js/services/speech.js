@@ -2,13 +2,17 @@
 // 1. Chrome-Spracherkennung direkt auf dem Gerät (processLocally), falls verfügbar – Live-Text.
 // 2. Cloud-Erkennung von Chrome (Google) – nur, wenn in den Einstellungen ausdrücklich erlaubt.
 // 3. Whisper im Browser (transformers.js): Aufnahme läuft lokal, Umwandlung in Text auf dem Handy.
-//    Das Modell wird einmalig von Hugging Face geladen und im Browser zwischengespeichert;
+//    Bibliothek liegt in lib/transformers; das Modell wird einmalig von Hugging Face geladen und im Browser zwischengespeichert;
 //    dabei werden keine Audiodaten gesendet.
 import { settings } from '../core/config.js';
 
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 const LANG = 'de-DE';
-const TRANSFORMERS = 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.3.1/dist/transformers.min.js';
+// Fest eingebunden (lib/transformers, siehe HERKUNFT.md) – kein fremder Code zur Laufzeit.
+// Von Hugging Face werden nur die Modelldaten (Gewichte, keine Programme) geladen.
+const LIB = new URL('../../lib/transformers/', import.meta.url).href;
+const TRANSFORMERS = LIB + 'transformers.min.js';
+const ORT_PATHS = { mjs: LIB + 'ort-wasm-simd-threaded.asyncify.mjs', wasm: LIB + 'ort-wasm-simd-threaded.asyncify.wasm' };
 
 export const WHISPER_DEVICES = { cpu: 'Prozessor (empfohlen)', gpu: 'Grafikchip (WebGPU)' };
 
@@ -75,7 +79,10 @@ export function loadWhisper(onProgress = () => {}) {
     const { pipeline, env } = await import(TRANSFORMERS);
     // Mehrere Prozessorkerne nur mit Cross-Origin-Isolation möglich (wird über sw.js gesetzt).
     const threads = self.crossOriginIsolated ? Math.max(1, Math.min(6, (navigator.hardwareConcurrency || 4) - 2)) : 1;
-    if (env?.backends?.onnx?.wasm) env.backends.onnx.wasm.numThreads = threads;
+    if (env?.backends?.onnx?.wasm) {
+      env.backends.onnx.wasm.numThreads = threads;
+      env.backends.onnx.wasm.wasmPaths = ORT_PATHS; // sonst lädt die Bibliothek ihr Rechenwerk von jsDelivr
+    }
     const progress_callback = p => {
       if (p.status === 'progress' && p.total) {
         files[p.file] = [p.loaded, p.total];

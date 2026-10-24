@@ -73,6 +73,30 @@ export function select(value, options, onchange, placeholder, optional = false) 
     }));
 }
 
+/** Text für HTML/SVG maskieren (für innerHTML mit Inhalten aus dem Excel). */
+export const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+
+/**
+ * Zeigt den anonymisierten Text vor dem Senden an die KI. Er kann noch bearbeitet werden
+ * (z. B. nicht erkannte Namen entfernen). Liefert den (ggf. geänderten) Text oder null bei Abbruch.
+ * legend: Map Code -> Anzeigename (nur lokal angezeigt).
+ */
+export function confirmSend(title, text, legend = new Map()) {
+  return new Promise(resolve => {
+    const ta = h('textarea', { rows: 10, value: text, class: 'preview-text' });
+    const close = v => { m.remove(); resolve(v); };
+    const m = h('div', { class: 'modal' }, h('div', { class: 'sheet' },
+      h('h3', {}, title),
+      h('p', { class: 'hint' }, 'So geht der Text an die KI. Prüfe, ob noch Namen, Gesundheits- oder Familieninfos drin sind, und lösche sie bei Bedarf.'),
+      ta,
+      legend.size ? h('p', { class: 'hint' }, 'Codes (nur hier sichtbar): ', [...legend].map(([c, n]) => `${c} = ${n}`).join(' · ')) : null,
+      h('div', { class: 'actions' },
+        h('button', { class: 'btn ghost', onclick: () => close(null) }, 'Abbrechen'),
+        h('button', { class: 'btn primary', onclick: () => close(ta.value) }, 'Senden'))));
+    document.body.append(m);
+  });
+}
+
 /** Kurze Bestätigung mit Leo nach dem Speichern. */
 export function showSaved(n) {
   const m = h('div', { class: 'modal saved', onclick: () => m.remove() }, h('div', { class: 'sheet center' },

@@ -50,7 +50,7 @@ neu gezeichnet wird über `render()` aus `ui/dom.js`, das `ui/shell.js` beim Sta
 |---|---|---|
 | Feedback, Spieler, Kompetenzen, Positionen | OneDrive `…/Datenbank/Skill-Diary.xlsx` | einzige dauerhafte Ablage |
 | Exporte (PowerPoint) | OneDrive `…/Exporte/` | |
-| Einstellungen, KI-Schlüssel | `localStorage` `sd.settings` | nur auf dem Handy |
+| Einstellungen, KI-Schlüssel | `localStorage` `sd.settings` | nur auf dem Handy, beim Abmelden gelöscht |
 | Kopie der Konfiguration | `localStorage` `sd.cfg` | für Anonymisierung ohne Netz |
 | Entwurf, ausstehende Einträge | `localStorage` `sd.draft`, `sd.pending` | werden nach Upload geleert |
 | Sprachmodell | Cache `transformers-cache` | wird bei Updates nicht gelöscht |
@@ -65,9 +65,34 @@ bestehenden Dateien automatisch, ältere vorgemerkte Zeilen werden aufgefüllt.
 - Sprache im Code-Kommentar und in der Oberfläche: Deutsch. Jede Datei beginnt mit einem Kommentar zu ihrem Zweck.
 - Oberfläche wird mit `h(tag, attrs, ...kinder)` gebaut, Zustand liegt zentral in `S` (`core/state.js`).
   Eingabefelder schreiben direkt in den Zustand; `render()` zeichnet die aktuelle Ansicht neu.
-- Bibliotheken liegen fest in `lib/` (keine CDN-Abhängigkeit beim Start). Ausnahme: transformers.js
-  für Whisper wird bei Bedarf von jsDelivr geladen.
+- Bibliotheken liegen fest in `lib/` (keine CDN-Abhängigkeit). Herkunft und Update-Anleitung für
+  transformers.js/ONNX in `lib/transformers/HERKUNFT.md`.
 - Keine Personendaten im Repo – auch nicht in Vorlagen, Tests oder Beispielen.
+
+## Sicherheit und Datenschutz
+
+| Maßnahme | Wo |
+|---|---|
+| Keine Personendaten im Repo (auch nicht in Tests, Vorlagen, Beispielen) | Konvention |
+| Namen vor jedem KI-Aufruf durch Zufallscodes ersetzt; Zuordnung nur im Arbeitsspeicher | `services/anon.js` |
+| Vorschau des anonymisierten Texts vor dem Senden, editierbar (abschaltbar, Standard: an) | `ui/dom.js` `confirmSend` |
+| Alle Bibliotheken fest im Repo (`lib/`), kein fremder Code zur Laufzeit; von Hugging Face nur Modelldaten | `lib/`, `services/speech.js` |
+| Content Security Policy: Code nur aus dem Repo; Verbindungen nur zu Microsoft, Anthropic, Hugging Face | `index.html` |
+| Inhalte aus dem Excel werden vor `innerHTML` maskiert (`esc`) | `ui/charts.js` |
+| Abmelden löscht alle lokalen App-Daten (`sd.*`) inkl. KI-Schlüssel | `services/auth.js` `clearLocalData` |
+| Exporte nur ins OneDrive; Download aufs Handy nur auf Wunsch | `views/stats.js`, Einstellungen |
+| Spracheingabe lokal (Chrome lokal bzw. Whisper im Browser); Cloud nur nach ausdrücklicher Einstellung | `services/speech.js` |
+
+**Bekannte Restrisiken**
+- *Gleiche Herkunft wie der Dokumentenmanager* (`mattment1980.github.io`): beide Apps teilen sich den
+  Browser-Speicher (Anmeldungen, Schlüssel). Abhilfe: eigene Adresse für Skill Diary.
+- *Berechtigung `Files.ReadWrite`* gilt für das gesamte OneDrive. Engere Alternative wäre ein App-Ordner.
+- *Pseudonymisierung ≠ Anonymisierung*: nicht hinterlegte Namen, falsch erkannte Namen und Inhalte
+  (Gesundheit, Familie) gehen im Klartext an die KI, sofern sie in der Vorschau nicht entfernt werden.
+- Entwurf und ausstehende Einträge liegen bis zum Upload unverschlüsselt im Browser-Speicher.
+
+Neue externe Verbindungen erfordern eine Anpassung der Content Security Policy in `index.html` –
+bewusst, damit jede neue Datenweitergabe sichtbar entschieden wird.
 
 ## Neue Funktion hinzufügen (Beispiele)
 

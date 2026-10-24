@@ -22,6 +22,8 @@ const DEFAULTS = {
   folder: '12_Fussball Kinder/Saison 26-27 (2017)/04_Skill Diary - Claude/Datenbank',
   exportFolder: '12_Fussball Kinder/Saison 26-27 (2017)/04_Skill Diary - Claude/Exporte',
   allowCloudSpeech: false,
+  previewBeforeSend: true,   // anonymisierten Text vor dem Senden an die KI anzeigen
+  downloadExports: false,    // Exporte zusätzlich in die Downloads des Handys legen
 };
 
 const KEY = 'sd.settings';

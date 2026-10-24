@@ -8,7 +8,7 @@ import * as od from '../services/onedrive.js';
 import { anonymize } from '../services/anon.js';
 import { summarize } from '../services/ai.js';
 import { buildPptx } from '../export/report.js';
-import { h, toast, withBusy, render, select, levelPicker } from '../ui/dom.js';
+import { h, toast, confirmSend, withBusy, render, select, levelPicker } from '../ui/dom.js';
 import { radar, skillBars, timeline } from '../ui/charts.js';
 
 export function statsView() {
@@ -115,13 +115,18 @@ function overview() {
 }
 async function makeSummary(rows) {
   const player = S.cfg.players.find(p => p.name === S.stats.player);
+  const code = 'P-ICH';
+  const lines = [...rows].reverse().map(f => `${fmtDate(f.Datum)} | ${[f.Art, f.Anlass].filter(Boolean).join(' ') || '–'} | ${f.Bereich}/${f.Skill} | ${f.Bewertung} | ${Number(f.Niveau) || '–'} | ${String(f.Kommentar).replace(/\n/g, ' ')}`);
+  const anon = await anonymize(lines.join('\n'), S.cfg.players,
+    async (_t, cands) => (cands.includes(player) ? player : null), { player, code });
+  let text = anon.text.replace(/P-(?!ICH)[A-Z2-9]{3}/g, 'ein Mitspieler');
+  if (settings.previewBeforeSend) {
+    text = await confirmSend('Vorschau: an die KI', text, new Map([[code, player.name]]));
+    if (text == null) return;
+  }
   await withBusy('Zusammenfassung wird geschrieben …', async () => {
-    const code = 'P-ICH';
-    const lines = [...rows].reverse().map(f => `${fmtDate(f.Datum)} | ${[f.Art, f.Anlass].filter(Boolean).join(' ') || '–'} | ${f.Bereich}/${f.Skill} | ${f.Bewertung} | ${Number(f.Niveau) || '–'} | ${String(f.Kommentar).replace(/\n/g, ' ')}`);
-    const { text } = await anonymize(lines.join('\n'), S.cfg.players,
-      async (_t, cands) => (cands.includes(player) ? player : null), { player, code });
     const period = `${fmtDate(S.stats.from)} – ${fmtDate(S.stats.to)}`;
-    const r = await summarize({ code, lines: text.replace(/P-(?!ICH)[A-Z2-9]{3}/g, 'ein Mitspieler').split('\n'), period });
+    const r = await summarize({ code, lines: text.split('\n'), period });
     S.summary = { period, ...r };
   });
 }
@@ -157,9 +162,11 @@ async function exportPptx() {
       areas: areas(), skills: S.cfg.skills,
     });
     const file = `${name} - Entwicklungsgespräch ${today()}.pptx`;
-    const a = h('a', { href: URL.createObjectURL(blob), download: file });
-    document.body.append(a); a.click(); a.remove();
     await od.uploadFile(settings.exportFolder, file, blob);
-    toast('PowerPoint gespeichert (OneDrive „Exporte“ + Download)', 'ok');
+    if (settings.downloadExports) {
+      const a = h('a', { href: URL.createObjectURL(blob), download: file });
+      document.body.append(a); a.click(); a.remove();
+    }
+    toast(settings.downloadExports ? 'PowerPoint gespeichert (OneDrive „Exporte“ + Download)' : 'PowerPoint gespeichert in OneDrive „Exporte“', 'ok');
   });
 }

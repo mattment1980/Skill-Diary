@@ -26,7 +26,14 @@ export function login() {
   return app.loginRedirect({ scopes: CONFIG.scopes, prompt: 'select_account' });
 }
 
+/** Alle lokal gespeicherten App-Daten löschen (Einstellungen inkl. KI-Schlüssel, Entwurf, Vormerkungen, Spielerliste).
+ *  Das Sprachmodell bleibt (enthält keine Personendaten). */
+export function clearLocalData() {
+  try { Object.keys(localStorage).filter(k => k.startsWith('sd.')).forEach(k => localStorage.removeItem(k)); } catch { /* */ }
+}
+
 export function logout() {
+  clearLocalData();
   return app.logoutRedirect({ account: app.getActiveAccount() });
 }
 

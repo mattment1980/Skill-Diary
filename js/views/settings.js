@@ -24,7 +24,16 @@ export function settingsView() {
   return h('section', { class: 'view settings' },
     h('div', { class: 'card' }, h('h3', {}, 'Konto'),
       h('p', {}, accountName()),
-      h('button', { class: 'btn ghost', onclick: logout }, 'Abmelden')),
+      h('p', { class: 'hint' }, 'Beim Abmelden werden alle Daten der App auf diesem Handy gelöscht (inkl. KI-Schlüssel). Die Daten im OneDrive bleiben.'),
+      h('button', { class: 'btn ghost', onclick: () => {
+        const warn = S.pending.length ? `\n\nAchtung: ${S.pending.length} Einträge sind noch nicht im OneDrive und gehen verloren.` : '';
+        if (confirm(`Abmelden und Daten auf diesem Handy löschen?${warn}`)) logout();
+      } }, 'Abmelden & Handy-Daten löschen')),
+    h('div', { class: 'card' }, h('h3', {}, 'Datenschutz'),
+      h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: settings.previewBeforeSend, onchange: e => saveSettings({ previewBeforeSend: e.target.checked }) }),
+        'Text vor dem Senden an die KI anzeigen (empfohlen)'),
+      h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: settings.downloadExports, onchange: e => saveSettings({ downloadExports: e.target.checked }) }),
+        'Exporte zusätzlich in die Downloads des Handys legen')),
     h('div', { class: 'card' }, h('h3', {}, 'KI'),
       field('Anthropic-Schlüssel (bleibt nur auf diesem Handy)', 'apiKey', 'password'),
       field('Modell Zuordnung', 'modelExtract'),

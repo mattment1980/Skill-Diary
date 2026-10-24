@@ -1,10 +1,10 @@
 // Ansicht „Erfassen“: Kontext, Notiz (Text oder Diktat), KI-Zuordnung bzw. manuelle Erfassung.
-import { today } from '../core/config.js';
+import { today, settings } from '../core/config.js';
 import { S, saveDraft, activePlayers, areas, skillsOf, areaOfSkill, displayName, emptyEntry } from '../core/state.js';
 import { anonymize, deanonymize } from '../services/anon.js';
 import { extractFeedback } from '../services/ai.js';
 import { startDictation } from '../services/speech.js';
-import { h, $, toast, choose, withBusy, render, speechStatus } from '../ui/dom.js';
+import { h, $, toast, choose, confirmSend, withBusy, render, speechStatus } from '../ui/dom.js';
 
 export function captureView() {
   const d = S.draft;
@@ -13,7 +13,7 @@ export function captureView() {
     onclick: () => { d.art = d.art === val ? '' : val; saveDraft(); render(); },
   }, val);
   const ta = h('textarea', {
-    id: 'note', rows: 9, placeholder: 'Was ist dir aufgefallen? z. B. „Ferdi hat heute als LV super gescannt, Moritz muss am ersten Kontakt arbeiten …“',
+    id: 'note', rows: 9, placeholder: 'Was ist dir aufgefallen? z. B. „Max hat heute als LV super gescannt, Tom muss am ersten Kontakt arbeiten …“',
     value: d.text, oninput: e => { d.text = e.target.value; saveDraft(); },
   });
   const dict = S.dictation;
@@ -92,9 +92,16 @@ async function runAI() {
   const d = S.draft;
   await stopDictation();
   if (!d.text.trim()) return toast('Erst etwas diktieren oder eintippen.');
+  // Anonymisieren und (optional) Vorschau vor dem Senden – noch ohne Ladefenster, da Dialoge folgen können.
+  const anon = await anonymize(d.text, activePlayers(),
+    (token, cands) => choose(`Welcher „${token}“ ist gemeint?`, cands, p => p.name));
+  const codes = anon.codes;
+  let text = anon.text;
+  if (settings.previewBeforeSend) {
+    text = await confirmSend('Vorschau: an die KI', text, new Map([...codes].map(([c, p]) => [c, p.name])));
+    if (text == null) return;
+  }
   await withBusy('KI ordnet zu …', async () => {
-    const { text, codes } = await anonymize(d.text, activePlayers(),
-      (token, cands) => choose(`Welcher „${token}“ ist gemeint?`, cands, p => p.name));
     if (!codes.size) toast('Kein Spielername erkannt – bitte Spieler in der Prüfung auswählen.');
     const r = await extractFeedback({ text, codes, skills: S.cfg.skills, positions: S.cfg.positions, dateStr: `${today()} (${new Date().toLocaleDateString('de-DE', { weekday: 'long' })})` });
     const k = r.kontext || {};

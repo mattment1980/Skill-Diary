@@ -197,3 +197,5 @@ label.check { display: flex; gap: 10px; align-items: center; color: var(--muted)
 .sk-n { color: var(--muted); font-size: .8rem; }
 .list-title { display: flex; align-items: center; gap: 8px; }
 .mini.clear { width: auto; padding: 0 10px; font-size: .8rem; margin-left: auto; }
+.preview-text { font-size: .9rem; min-height: 180px; }
+.modal .sheet { max-height: 92vh; overflow-y: auto; }
