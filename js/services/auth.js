@@ -32,7 +32,7 @@ export function login() {
  * Andere Apps unter derselben Adresse (z. B. Dokumentenmanager) bleiben unberührt: gelöscht werden nur
  * Schlüssel mit Präfix "sd." bzw. mit der Client-ID dieser App und die eigenen Caches.
  */
-export async function clearLocalData() {
+async function clearLocalData() {
   try {
     Object.keys(localStorage)
       .filter(k => k.startsWith('sd.') || k.includes(CONFIG.clientId))

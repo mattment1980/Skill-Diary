@@ -3,7 +3,7 @@ import { CONFIG } from './config.js';
 
 const MONTHS = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
 const dayNum = iso => Date.UTC(+iso.slice(0, 4), +iso.slice(5, 7) - 1, +iso.slice(8, 10)) / 86400000;
-export const isIsoDate = v => /^\d{4}-\d{2}-\d{2}$/.test(String(v));
+const isIsoDate = v => /^\d{4}-\d{2}-\d{2}$/.test(String(v));
 
 /**
  * Teilt Einträge in lückenlose Zeitabschnitte (je Woche bei bis zu ~10 Wochen, sonst je Monat).

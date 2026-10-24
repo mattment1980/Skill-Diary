@@ -3,6 +3,7 @@
 import { CONFIG, settings, today } from '../core/config.js';
 import { S, activePlayers, areas, skillsOf, areaOfSkill, inStatsRange } from '../core/state.js';
 import { fmtDate, shortPeriod } from '../core/format.js';
+import { ratingCounts } from '../core/stats.js';
 import { loadFeedback } from '../core/data.js';
 import * as od from '../services/onedrive.js';
 import { anonymize } from '../services/anon.js';
@@ -11,6 +12,21 @@ import { buildPptx } from '../export/report.js';
 import { h, toast, confirmSend, withBusy, render, select, levelPicker } from '../ui/dom.js';
 import { radar, skillBars, timeline } from '../ui/charts.js';
 
+let loading = false;
+/** Feedback (neu) laden; Fehler als Meldung, danach neu zeichnen. */
+function reload() {
+  if (loading) return;
+  loading = true;
+  loadFeedback().catch(e => toast(e.message, 'error')).finally(() => { loading = false; render(); });
+}
+
+/** Gestapelter Balken Positiv/Neutral/Kritisch. */
+function ratingBar(rows) {
+  const counts = ratingCounts(rows), t = rows.length || 1;
+  return h('div', { class: 'bar' }, ...CONFIG.ratings.map((r, i) =>
+    counts[i] ? h('span', { class: `seg r-${r.toLowerCase()}`, style: `flex:${counts[i] / t}` }, counts[i]) : null));
+}
+
 export function statsView() {
   const st = S.stats;
   const head = h('div', { class: 'card context' },
@@ -18,28 +34,21 @@ export function statsView() {
     h('div', { class: 'row' },
       h('label', {}, 'von', h('input', { type: 'date', value: st.from, onchange: e => { st.from = e.target.value; S.summary = null; render(); } })),
       h('label', {}, 'bis', h('input', { type: 'date', value: st.to, onchange: e => { st.to = e.target.value; S.summary = null; render(); } })),
-      h('button', { class: 'icon-btn', 'aria-label': 'Neu laden', onclick: () => { S.feedback = null; loadFeedback(); } }, '↻')));
-  if (!S.feedback) { loadFeedback(); return h('section', { class: 'view' }, head, h('p', { class: 'hint' }, 'Lade Daten …')); }
+      h('button', { class: 'icon-btn', 'aria-label': 'Neu laden', onclick: () => { S.feedback = null; reload(); } }, '↻')));
+  if (!S.feedback) { reload(); return h('section', { class: 'view' }, head, h('p', { class: 'hint' }, 'Lade Daten …')); }
   if (!st.player) return h('section', { class: 'view' }, head, overview());
 
   const all = S.feedback.filter(f => f.Spieler === st.player && inStatsRange(f))
     .sort((a, b) => String(b.Datum).localeCompare(String(a.Datum)));
   const list = st.skill ? all.filter(f => f.Skill === st.skill) : st.area ? all.filter(f => f.Bereich === st.area) : all;
-  const count = (rows, r) => rows.filter(f => f.Bewertung === r).length;
-  const bar = rows => {
-    const t = rows.length || 1;
-    return h('div', { class: 'bar' }, ...CONFIG.ratings.map(r => {
-      const n = count(rows, r);
-      return n ? h('span', { class: `seg r-${r.toLowerCase()}`, style: `flex:${n / t}` }, n) : null;
-    }));
-  };
+
   return h('section', { class: 'view stats' }, head,
     h('div', { class: 'card' },
-      h('div', { class: 'totals' }, ...CONFIG.ratings.map(r => h('div', { class: `total r-${r.toLowerCase()}` }, h('b', {}, count(all, r)), r))),
+      h('div', { class: 'totals' }, ...CONFIG.ratings.map(r => h('div', { class: `total r-${r.toLowerCase()}` }, h('b', {}, ratingCounts(all)[CONFIG.ratings.indexOf(r)]), r))),
       ...areas().map(a => {
         const rows = all.filter(f => f.Bereich === a);
         return h('button', { class: `area-row ${st.area === a ? 'on' : ''}`, onclick: () => { st.area = st.area === a ? '' : a; st.skill = ''; render(); } },
-          h('span', { class: 'area-name' }, a, h('small', {}, ` ${rows.length}`)), bar(rows));
+          h('span', { class: 'area-name' }, a, h('small', {}, ` ${rows.length}`)), ratingBar(rows));
       })),
     radar(all, st.player),
     skillBars(all),
@@ -99,6 +108,7 @@ async function removeFeedback(f) {
     toast('Gelöscht', 'ok');
   });
 }
+/** Übersicht ohne gewählten Spieler: Einträge je Spieler. */
 function overview() {
   const by = {};
   for (const f of S.feedback) (by[f.Spieler] ||= []).push(f);
@@ -107,10 +117,7 @@ function overview() {
       const rows = by[p.name] || [];
       return h('button', { class: 'area-row', onclick: () => { S.stats.player = p.name; render(); } },
         h('span', { class: 'area-name' }, p.name, h('small', {}, ` ${rows.length}`)),
-        h('div', { class: 'bar' }, ...CONFIG.ratings.map(r => {
-          const n = rows.filter(f => f.Bewertung === r).length;
-          return n ? h('span', { class: `seg r-${r.toLowerCase()}`, style: `flex:${n}` }, n) : null;
-        })));
+        ratingBar(rows));
     }));
 }
 async function makeSummary(rows) {

@@ -1,5 +1,11 @@
 # Changelog
 
+## 26 – 24.10.2026 (Aufräumen)
+- `core/data.js` ohne Oberflächenaufrufe; Datenbank-Import aus dem Rahmen in `core/data.js` verlagert
+- PowerPoint-Export aufgeteilt in `export/charts.js` (Grafiken) und `export/report.js` (Vorlage befüllen)
+- Zählungen der Auswertung aus `core/stats.js`; ungenutzte Exporte entfernt
+- Offline-Cache um PowerPoint-Export, JSZip und Vorlage ergänzt
+
 ## 25 (Umzug) – 24.10.2026
 - Eigene Adresse `skilldiary.mentschel.com` (getrennt vom Dokumentenmanager)
 

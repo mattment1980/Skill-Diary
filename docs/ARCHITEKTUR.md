@@ -22,12 +22,15 @@ index.html ─► js/main.js            Einstieg: Service Worker, Anmeldung, ers
    │             │ config.js  Konstanten, lokale Einstellungen   │
    ├─────────────┼───────────────────────────────────────────────┤
    │ services/   │ auth · onedrive · ai · speech · anon          │  Anbindung nach außen
-   │ export/     │ report.js  PowerPoint-Export                  │
+   │ export/     │ report.js  PowerPoint befüllen                │
+   │             │ charts.js  Grafiken für PowerPoint (Canvas)   │
    └─────────────┴───────────────────────────────────────────────┘
 ```
 
-**Abhängigkeitsregel:** Pfeile zeigen nur nach unten. `services/` und `core/` kennen keine Oberfläche
-(Ausnahme: `core/data.js` meldet Fehler über `toast`). Ansichten importieren nie andere Ansichten;
+**Abhängigkeitsregel:** Pfeile zeigen nur nach unten. `services/`, `core/` und `export/` kennen keine
+Oberfläche: Sie ändern den Zustand `S` und liefern Ergebnisse zurück; Meldungen (`toast`) und Neuzeichnen
+(`render()`) übernehmen `ui/` und `views/`. Datenzugriffe aus der Oberfläche laufen über `core/data.js`
+(Ausnahme: einfache Dienstaufrufe wie Anmelden/Abmelden). Ansichten importieren nie andere Ansichten;
 neu gezeichnet wird über `render()` aus `ui/dom.js`, das `ui/shell.js` beim Start registriert.
 
 ## Datenfluss
@@ -103,7 +106,7 @@ bewusst, damit jede neue Datenweitergabe sichtbar entschieden wird.
   Schema in `services/ai.js` erweitern → Vorlage mit `tools/build_xlsx_template.py` neu erzeugen.
 - **Neue Ansicht:** Datei in `views/` mit `export function xyView()`, in `ui/shell.js` bei `views` und in der
   Navigation eintragen, ins `SHELL`-Verzeichnis von `sw.js` aufnehmen.
-- **Neue Grafik:** Berechnung nach `core/stats.js` (mit Test), Darstellung in `ui/charts.js` bzw. `export/report.js`.
+- **Neue Grafik:** Berechnung nach `core/stats.js` (mit Test), Darstellung in `ui/charts.js` (Bildschirm) bzw. `export/charts.js` (PowerPoint).
 
 ## Release
 

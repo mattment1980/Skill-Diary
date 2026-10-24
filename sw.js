@@ -10,6 +10,7 @@ const SHELL = ['./', 'index.html', 'css/app.css', 'manifest.webmanifest', 'lib/m
   'js/services/auth.js', 'js/services/onedrive.js', 'js/services/ai.js', 'js/services/speech.js', 'js/services/anon.js',
   'js/ui/dom.js', 'js/ui/charts.js', 'js/ui/shell.js',
   'js/views/capture.js', 'js/views/review.js', 'js/views/stats.js', 'js/views/settings.js',
+  'js/export/charts.js', 'js/export/report.js', 'lib/jszip.min.js', 'template/Auswertung-Vorlage.pptx',
   'assets/logo.png', 'assets/bg.webp', 'assets/leo.webp', 'assets/leo-head.webp', 'assets/icon-192.png'];
 
 self.addEventListener('install', e => {

@@ -65,7 +65,7 @@ function startWebSpeech({ local, onText, onInterim, onEnd }) {
 let transcriberPromise = null;
 let transcriberModel = '';
 /** Info zur letzten Umwandlung (für die Anzeige): backend 'WebGPU' | 'Prozessor', threads, Dauer. */
-export const whisperInfo = { backend: '', threads: 1 };
+const whisperInfo = { backend: '', threads: 1 };
 
 /** Lädt das Whisper-Modell (einmalig, danach aus dem Browser-Cache). onProgress(0..100). */
 export function loadWhisper(onProgress = () => {}) {

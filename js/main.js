@@ -1,12 +1,12 @@
 // Einstiegspunkt: Service Worker, Anmeldung, erste Synchronisation.
 // Aufbau und Konventionen: docs/ARCHITEKTUR.md
 import { settings } from './core/config.js';
-import { syncConfig, flushPending } from './core/data.js';
+import { syncConfig } from './core/data.js';
 import { S } from './core/state.js';
 import { initAuth } from './services/auth.js';
 import { whisperCached, localStatus, loadWhisper } from './services/speech.js';
 import { toast, render } from './ui/dom.js';
-import { loginView } from './ui/shell.js';
+import { loginView, flushAndNotify } from './ui/shell.js';
 
 async function start() {
   if ('serviceWorker' in navigator) {
@@ -21,7 +21,7 @@ async function start() {
   render();
   try {
     await syncConfig();
-    if (!S.noDb) await flushPending();
+    if (!S.noDb) await flushAndNotify();
   } catch (e) { toast(e.message, 'error'); }
   render();
   // Sprachmodell im Hintergrund in den Speicher holen, damit das erste Diktat nicht warten muss.
