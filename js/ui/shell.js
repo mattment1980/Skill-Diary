@@ -1,9 +1,10 @@
 // Rahmen der App: Kopfzeile, aktive Ansicht, Ladefenster, Navigation; außerdem die Anmeldeseite.
 import { S } from '../core/state.js';
 import { flushPending, syncConfig } from '../core/data.js';
-import { appFolderUrl } from '../services/onedrive.js';
+import { appFolderUrl, uploadFile } from '../services/onedrive.js';
+import { CONFIG, settings } from '../core/config.js';
 import { login } from '../services/auth.js';
-import { h, $, withBusy, setRenderer } from './dom.js';
+import { h, $, toast, withBusy, setRenderer } from './dom.js';
 import { captureView } from '../views/capture.js';
 import { reviewView } from '../views/review.js';
 import { statsView } from '../views/stats.js';
@@ -32,18 +33,29 @@ function render() {
   if (S.tab === 'settings') showModelStatus();
 }
 
+/** Gewählte Excel-Datei als Datenbank in den App-Ordner hochladen (Umzug ohne Ordnersuche). */
+async function importWorkbook(file) {
+  if (!file) return;
+  if (!/\.xlsx$/i.test(file.name)) return toast('Bitte eine .xlsx-Datei wählen.', 'error');
+  await withBusy('Übernehme Datenbank …', async () => {
+    await uploadFile(settings.folder, CONFIG.workbookName, file);
+    await syncConfig();
+    if (!S.noDb) toast('Datenbank übernommen ✓ – die alte Datei kannst du jetzt löschen oder umbenennen.', 'ok');
+  });
+}
+
 /** Hinweis, wenn im App-Ordner noch keine Datenbank liegt (Umzug oder Neueinrichtung). */
 function setupCard() {
   return h('div', { class: 'card setup' },
     h('h3', {}, 'Datenbank nicht gefunden'),
     h('p', {}, 'Die App greift nur noch auf ihren eigenen Ordner zu: ', h('b', {}, 'OneDrive › Apps › Skill Diary'), '.'),
-    h('ol', {},
-      h('li', {}, 'Ordner öffnen (Button unten) – er wurde gerade angelegt.'),
-      h('li', {}, 'Deine Ordner „Datenbank“ und „Exporte“ aus dem bisherigen Ort dorthin verschieben.'),
-      h('li', {}, '„Erneut prüfen“ tippen.')),
+    h('p', { class: 'hint' }, 'Am einfachsten: deine bisherige Skill-Diary.xlsx auswählen (z. B. in OneDrive), die App legt sie selbst in ihren Ordner.'),
+    h('label', { class: 'btn primary block file-btn' }, 'Bestehende Datenbank auswählen',
+      h('input', { type: 'file', accept: '.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', onchange: e => importWorkbook(e.target.files[0]) })),
+    h('p', { class: 'hint' }, 'Oder selbst verschieben: „Datenbank“ nach OneDrive › Apps › Skill Diary, dann „Erneut prüfen“.'),
     h('div', { class: 'actions' },
       h('button', { class: 'btn ghost', onclick: () => withBusy('Öffne Ordner …', async () => { window.open(await appFolderUrl(), '_blank', 'noopener'); }) }, 'Ordner öffnen'),
-      h('button', { class: 'btn primary', onclick: () => withBusy('Prüfe …', () => syncConfig()) }, 'Erneut prüfen')),
+      h('button', { class: 'btn ghost', onclick: () => withBusy('Prüfe …', () => syncConfig()) }, 'Erneut prüfen')),
     h('button', { class: 'btn ghost block', onclick: () => {
       if (confirm('Wirklich eine neue, leere Datenbank anlegen? Nur wählen, wenn du keine bestehende Datenbank übernehmen willst.')) withBusy('Lege an …', () => syncConfig({ create: true }));
     } }, 'Stattdessen leere Datenbank anlegen'));

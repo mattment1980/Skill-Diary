@@ -1,5 +1,8 @@
 # Changelog
 
+## 22 – 24.10.2026
+- Umzug: bestehende Datenbank per Dateiauswahl übernehmen (lädt sie in den App-Ordner)
+
 ## 21 – 24.10.2026
 - Anmeldung: Zeitüberschreitung der unsichtbaren Anmeldung führt jetzt zur Microsoft-Anmeldeseite (statt Fehlermeldung)
 
