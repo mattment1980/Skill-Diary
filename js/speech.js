@@ -10,6 +10,8 @@ const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 const LANG = 'de-DE';
 const TRANSFORMERS = 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.3.1/dist/transformers.min.js';
 
+export const WHISPER_DEVICES = { cpu: 'Prozessor (empfohlen)', gpu: 'Grafikchip (WebGPU)' };
+
 export const WHISPER_MODELS = {
   'onnx-community/whisper-small': 'Genau (ca. 250 MB, empfohlen)',
   'onnx-community/whisper-base': 'Schnell (ca. 80 MB)',
@@ -64,13 +66,15 @@ export const whisperInfo = { backend: '', threads: 1 };
 /** Lädt das Whisper-Modell (einmalig, danach aus dem Browser-Cache). onProgress(0..100). */
 export function loadWhisper(onProgress = () => {}) {
   const model = settings.whisperModel || Object.keys(WHISPER_MODELS)[0];
-  if (transcriberPromise && transcriberModel === model) return transcriberPromise;
-  transcriberModel = model;
+  const device = settings.whisperDevice || 'cpu'; // Auf Handys ist der Prozessor meist schneller als WebGPU
+  const key = `${model}|${device}`;
+  if (transcriberPromise && transcriberModel === key) return transcriberPromise;
+  transcriberModel = key;
   const files = {};
   transcriberPromise = (async () => {
     const { pipeline, env } = await import(TRANSFORMERS);
     // Mehrere Prozessorkerne nur mit Cross-Origin-Isolation möglich (wird über sw.js gesetzt).
-    const threads = self.crossOriginIsolated ? Math.max(1, Math.min(4, (navigator.hardwareConcurrency || 4) - 1)) : 1;
+    const threads = self.crossOriginIsolated ? Math.max(1, Math.min(6, (navigator.hardwareConcurrency || 4) - 2)) : 1;
     if (env?.backends?.onnx?.wasm) env.backends.onnx.wasm.numThreads = threads;
     const progress_callback = p => {
       if (p.status === 'progress' && p.total) {
@@ -79,7 +83,7 @@ export function loadWhisper(onProgress = () => {}) {
         onProgress(Math.round((l / t) * 100));
       }
     };
-    const webgpu = !!navigator.gpu && !!(await navigator.gpu.requestAdapter().catch(() => null));
+    const webgpu = device === 'gpu' && !!navigator.gpu && !!(await navigator.gpu.requestAdapter().catch(() => null));
     if (webgpu) {
       try {
         const t = await pipeline('automatic-speech-recognition', model, {

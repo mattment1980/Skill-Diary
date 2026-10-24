@@ -5,10 +5,10 @@ import { initAuth, login, logout, accountName } from './auth.js';
 import * as od from './onedrive.js';
 import { anonymize, deanonymize } from './anon.js';
 import { extractFeedback, summarize } from './ai.js';
-import { startDictation, localStatus, loadWhisper, whisperCached, WHISPER_MODELS } from './speech.js';
+import { startDictation, localStatus, loadWhisper, whisperCached, WHISPER_MODELS, WHISPER_DEVICES } from './speech.js';
 import { buildDocx } from './export.js';
 
-const APP_VERSION = '11';
+const APP_VERSION = '12';
 
 /* ---------- Zustand ---------- */
 const S = {
@@ -478,6 +478,9 @@ function settingsView() {
       h('label', { class: 'field' }, 'Sprachmodell',
         h('select', { onchange: e => { saveSettings({ whisperModel: e.target.value }); showModelStatus(); } },
           ...Object.entries(WHISPER_MODELS).map(([v, l]) => h('option', { value: v, selected: (settings.whisperModel || Object.keys(WHISPER_MODELS)[0]) === v }, l)))),
+      h('label', { class: 'field' }, 'Rechnen auf',
+        h('select', { onchange: e => { saveSettings({ whisperDevice: e.target.value }); loadWhisper().catch(() => {}); } },
+          ...Object.entries(WHISPER_DEVICES).map(([v, l]) => h('option', { value: v, selected: (settings.whisperDevice || 'cpu') === v }, l)))),
       h('p', { id: 'model-status', class: 'model-status' }, 'Sprachmodell: wird geprüft …'),
       h('p', { class: 'hint' }, `Letzte Umwandlung: ${load('sd.lastSpeech', null) ?? (() => { try { return localStorage.getItem('sd.lastSpeech') || '–'; } catch { return '–'; } })()}`),
       h('p', { class: 'hint' }, `Technik: WebGPU ${navigator.gpu ? 'vorhanden' : 'nicht vorhanden'} · Mehrkern ${self.crossOriginIsolated ? 'aktiv' : 'nicht aktiv'} · ${navigator.hardwareConcurrency || '?'} Kerne`),
