@@ -8,7 +8,7 @@ import { extractFeedback, summarize } from './ai.js';
 import { startDictation, localStatus, loadWhisper, whisperCached, WHISPER_MODELS } from './speech.js';
 import { buildDocx } from './export.js';
 
-const APP_VERSION = '7';
+const APP_VERSION = '8';
 
 /* ---------- Zustand ---------- */
 const S = {
@@ -22,6 +22,8 @@ const S = {
   summary: null,
   busy: '',
   dictation: null,
+  editId: null,                         // Eintrag in der Auswertung, der gerade bearbeitet wird
+  edit: null,
 };
 const saveDraft = () => save('sd.draft', S.draft);
 const savePending = () => save('sd.pending', S.pending);
@@ -321,10 +323,57 @@ function statsView() {
       })),
     S.summary ? summaryEditor() : h('button', { class: 'btn primary block', disabled: !all.length, onclick: () => makeSummary(all) }, 'Zusammenfassung erstellen'),
     h('h3', { class: 'list-title' }, st.area ? `${st.area} (${list.length})` : `Alle Einträge (${list.length})`),
-    ...list.map(f => h('div', { class: `card fb r-${String(f.Bewertung).toLowerCase()}` },
-      h('div', { class: 'fb-meta' }, `${fmtDate(f.Datum)} · ${[f.Art, f.Anlass].filter(Boolean).join(' ') || '–'}${f.Position ? ' · ' + f.Position : ''}`),
+    ...list.map(f => (S.editId === f.ID ? editCard(f) : h('div', { class: `card fb r-${String(f.Bewertung).toLowerCase()}` },
+      h('div', { class: 'fb-head' },
+        h('div', { class: 'fb-meta' }, `${fmtDate(f.Datum)} · ${[f.Art, f.Anlass].filter(Boolean).join(' ') || '–'}${f.Position ? ' · ' + f.Position : ''}`),
+        h('button', { class: 'mini', 'aria-label': 'Bearbeiten', onclick: () => { S.editId = f.ID; S.edit = { ...f }; render(); } }, '✎'),
+        h('button', { class: 'mini', 'aria-label': 'Löschen', onclick: () => removeFeedback(f) }, '✕')),
       h('div', { class: 'fb-skill' }, f.Skill, h('span', { class: 'tag' }, f.Bewertung)),
-      h('div', {}, f.Kommentar))));
+      h('div', {}, f.Kommentar)))));
+}
+
+/** Bearbeitungsansicht eines gespeicherten Eintrags in der Auswertung. */
+function editCard(f) {
+  const e = S.edit;
+  return h('div', { class: 'card entry' },
+    h('div', { class: 'row' },
+      h('input', { type: 'date', value: e.Datum || '', onchange: ev => { e.Datum = ev.target.value; } }),
+      ...['Spiel', 'Training'].map(v => h('button', { class: `chip ${e.Art === v ? 'on' : ''}`, onclick: () => { e.Art = e.Art === v ? '' : v; render(); } }, v))),
+    h('input', { type: 'text', placeholder: 'Anlass / Gegner', value: e.Anlass || '', oninput: ev => { e.Anlass = ev.target.value; } }),
+    h('div', { class: 'rating' }, ...CONFIG.ratings.map(r => h('button', {
+      class: `chip r-${r.toLowerCase()} ${e.Bewertung === r ? 'on' : ''}`, onclick: () => { e.Bewertung = r; render(); },
+    }, r))),
+    h('div', { class: 'row' },
+      select(e.Bereich, areas(), v => { e.Bereich = v; if (!skillsOf(v).includes(e.Skill)) e.Skill = ''; render(); }, 'Bereich'),
+      select(e.Skill, skillsOf(e.Bereich).length ? skillsOf(e.Bereich) : S.cfg.skills.map(s => s.skill), v => { e.Skill = v; e.Bereich = areaOfSkill(v); render(); }, 'Skill')),
+    select(e.Position || '', S.cfg.positions.map(p => [p.code, `${p.code} – ${p.label || p.group}`]), v => { e.Position = v; }, 'Position (optional)', true),
+    h('textarea', { rows: 4, value: e.Kommentar, oninput: ev => { e.Kommentar = ev.target.value; } }),
+    h('div', { class: 'actions' },
+      h('button', { class: 'btn ghost', onclick: () => { S.editId = null; render(); } }, 'Abbrechen'),
+      h('button', { class: 'btn primary', onclick: saveEdit }, 'Speichern')));
+}
+
+async function saveEdit() {
+  const e = S.edit;
+  if (!e.Skill || !e.Bewertung || !String(e.Kommentar).trim()) return toast('Skill, Bewertung und Kommentar ausfüllen.', 'error');
+  const patch = { Datum: e.Datum || '', Art: e.Art || '', Anlass: e.Anlass || '', Bereich: e.Bereich, Skill: e.Skill,
+    Bewertung: e.Bewertung, Position: e.Position || '', Kommentar: String(e.Kommentar).trim() };
+  await withBusy('Speichere Änderung …', async () => {
+    await od.updateFeedback(e.ID, patch);
+    Object.assign(S.feedback.find(f => f.ID === e.ID), patch);
+    S.editId = null; S.summary = null;
+    toast('Geändert', 'ok');
+  });
+}
+
+async function removeFeedback(f) {
+  if (!confirm(`Diesen Eintrag wirklich löschen?\n\n${f.Skill}: ${String(f.Kommentar).slice(0, 80)}`)) return;
+  await withBusy('Lösche …', async () => {
+    await od.deleteFeedback(f.ID);
+    S.feedback = S.feedback.filter(x => x.ID !== f.ID);
+    S.summary = null;
+    toast('Gelöscht', 'ok');
+  });
 }
 
 function overview() {

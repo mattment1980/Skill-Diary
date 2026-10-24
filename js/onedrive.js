@@ -109,6 +109,34 @@ export async function readFeedback() {
   });
 }
 
+/** Sucht eine Feedback-Zeile per ID (frisch gelesen) und liefert Blatt-Zeilennummer und Werte. */
+async function findFeedbackRow(id) {
+  const r = await graph(`${wb()}/tables('${CONFIG.feedbackTable}')/range?$select=address,values`);
+  const startRow = Number(r.address.split('!')[1].match(/\d+/)[0]); // Kopfzeile
+  const idx = r.values.findIndex((row, i) => i > 0 && String(row[0]) === String(id));
+  if (idx < 0) throw new Error('Eintrag nicht gefunden – bitte Daten neu laden.');
+  return { sheetRow: startRow + idx, header: r.values[0], values: r.values[idx] };
+}
+
+/** Ändert Felder eines Feedback-Eintrags (patch: {Spaltenname: Wert}). */
+export async function updateFeedback(id, patch) {
+  const { sheetRow, header, values } = await findFeedbackRow(id);
+  const row = header.map((h, i) => (h in patch ? patch[h] : values[i]));
+  const last = String.fromCharCode(64 + header.length);
+  await graph(`${wb()}/worksheets('${CONFIG.feedbackTable}')/range(address='A${sheetRow}:${last}${sheetRow}')`, {
+    method: 'PATCH', body: { values: [row] },
+  });
+}
+
+/** Löscht einen Feedback-Eintrag (Tabellenzeile rückt nach oben). */
+export async function deleteFeedback(id) {
+  const { sheetRow, header } = await findFeedbackRow(id);
+  const last = String.fromCharCode(64 + header.length);
+  await graph(`${wb()}/worksheets('${CONFIG.feedbackTable}')/range(address='A${sheetRow}:${last}${sheetRow}')/delete`, {
+    method: 'POST', body: { shift: 'Up' },
+  });
+}
+
 /** Lädt eine Datei in einen OneDrive-Ordner hoch (Ordner werden bei Bedarf angelegt). */
 export async function uploadFile(folder, filename, blob) {
   return graph(byPath(`${folder}/${filename}`) + '/content', { method: 'PUT', body: blob });

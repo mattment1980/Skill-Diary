@@ -145,3 +145,6 @@ label.check { display: flex; gap: 10px; align-items: center; color: var(--muted)
 .version { text-align: center; margin: 8px 0; }
 .model-status { margin: 0; padding: 10px 12px; border-radius: 12px; background: var(--surface-2); color: var(--orange); font-weight: 600; }
 .model-status.ok { color: var(--pos); }
+.fb-head { display: flex; align-items: center; gap: 6px; }
+.fb-head .fb-meta { flex: 1; }
+.mini { background: transparent; border: 1px solid var(--line); color: var(--muted); border-radius: 10px; width: 36px; height: 32px; flex: none; }
