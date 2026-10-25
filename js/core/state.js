@@ -12,6 +12,7 @@ export const S = {
   feedback: null,                       // geladene Feedback-Daten (nur im Speicher)
   stats: { player: '', from: CONFIG.seasonStart, to: today(), area: '', skill: '' },
   summary: null,
+  sumPlayer: null, // Optionen der Zusammenfassung je Spieler (Themen-Gewichte, Hinweise) – nur im Arbeitsspeicher
   busy: '',
   dictation: null,
   editId: null,                         // Eintrag in der Auswertung, der gerade bearbeitet wird

@@ -25,7 +25,38 @@ const DEFAULTS = {
   allowCloudSpeech: false,
   previewBeforeSend: true,   // anonymisierten Text vor dem Senden an die KI anzeigen
   downloadExports: false,    // Exporte zusätzlich in die Downloads des Handys legen
+  summary: null,             // zuletzt gewählte Optionen der Zusammenfassung (siehe SUMMARY_DEFAULTS)
 };
+
+/** Abschnitte des Berichts (Reihenfolge wie in der PowerPoint). max = Höchstzahl Punkte (Listen). */
+export const SUMMARY_SECTIONS = [
+  { key: 'einschaetzung', label: 'Einschätzung vom Trainerteam' },
+  { key: 'super', label: 'Größte Stärken', max: 5 },
+  { key: 'verbessern', label: 'Kannst du verbessern', max: 5 },
+  { key: 'stolz', label: 'Darauf kannst du stolz sein', max: 2 },
+];
+
+/** Standard-Optionen der Zusammenfassung. Spielerbezogenes (Themen, Hinweise) wird nicht gespeichert. */
+export const SUMMARY_DEFAULTS = {
+  audience: 'kind',     // kind | eltern
+  tone: 'ermutigend',   // ermutigend | ausgewogen | klar
+  recency: 0,           // 0 gleichmäßig … 3 vor allem der aktuelle Stand
+  sections: {
+    einschaetzung: { on: true, areas: [] },        // areas leer = alle Bereiche
+    super: { on: true, areas: [], n: 5 },
+    verbessern: { on: true, areas: [], n: 5 },
+    stolz: { on: true, areas: [], n: 2 },
+  },
+};
+
+/** Gespeicherte Optionen mit den Standardwerten zusammenführen (auch nach App-Updates vollständig). */
+export function summaryOptions() {
+  const s = settings.summary || {};
+  const out = structuredClone(SUMMARY_DEFAULTS);
+  for (const k of ['audience', 'tone', 'recency']) if (s[k] != null) out[k] = s[k];
+  for (const k of Object.keys(out.sections)) Object.assign(out.sections[k], s.sections?.[k] || {});
+  return out;
+}
 
 const KEY = 'sd.settings';
 

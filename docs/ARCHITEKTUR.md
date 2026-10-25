@@ -44,7 +44,9 @@ neu gezeichnet wird über `render()` aus `ui/dom.js`, das `ui/shell.js` beim Sta
    `flushPending()` → `services/onedrive.js` `appendFeedback()` → Excel-Tabelle `Feedback`.
 5. **Auswertung** (`views/stats.js`): `loadFeedback()` lädt alle Zeilen in den Arbeitsspeicher;
    Diagramme aus `ui/charts.js` mit Zahlen aus `core/stats.js`.
-6. **Entwicklungsgespräch**: Zusammenfassung (`services/ai.js`, größeres Modell, anonymisiert) →
+6. **Entwicklungsgespräch**: Optionen (Zielgruppe, Ton, Gewichtung, Abschnitte, Themen aus `core/stats.js`
+   `suggestTopics`, Hinweise; gemerkt in `settings.summary`) → Zusammenfassung (`services/ai.js`
+   `summaryRequest`/`summarize`, größeres Modell, anonymisiert) →
    bearbeiten → `export/report.js` füllt `template/Auswertung-Vorlage.pptx` → OneDrive „Exporte“ + Download.
 
 ## Daten und Speicherorte

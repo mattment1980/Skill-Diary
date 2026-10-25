@@ -106,33 +106,69 @@ ${catalogText(skills)}`;
 }
 
 /** Erstellt die Spieler-Zusammenfassung aus (pseudonymisierten) Einträgen. */
-export async function summarize({ code, lines, period }) {
+const TONES = {
+  ermutigend: 'ermutigend und warm: Stärken deutlich würdigen, Kritik behutsam als nächsten Schritt formulieren',
+  ausgewogen: 'ausgewogen und sachlich-freundlich: Stärken und Baustellen gleich deutlich benennen',
+  klar: 'klar und fordernd: direkt sagen, was noch fehlt und was wir erwarten – respektvoll, nie abwertend',
+};
+const RECENCY = [
+  '',
+  'Gewichte die aktuellen Notizen etwas stärker als ältere.',
+  'Gewichte die aktuellen Notizen deutlich stärker; ältere Notizen vor allem, um die Entwicklung zu zeigen.',
+  'Beschreibe vor allem den aktuellen Stand; ältere Notizen nur als Vergleich für die Entwicklung.',
+];
+
+/**
+ * System-Prompt und Tool-Schema der Zusammenfassung aus den Optionen (ohne Personendaten).
+ * @param {{code:string, opts:object, recentFrom?:string}} p opts siehe SUMMARY_DEFAULTS in core/config.js
+ */
+export function summaryRequest({ code, opts, recentFrom = '' }) {
+  const sec = opts.sections;
+  const eltern = opts.audience === 'eltern';
+  const only = k => (sec[k].areas.length ? ` Nur aus dem Bereich ${sec[k].areas.join(' / ')}.` : '');
+  const props = {}, rules = [];
+  if (sec.einschaetzung.on) {
+    props.einschaetzung = { type: 'string', description: 'max. 100 Wörter' };
+    rules.push(`- einschaetzung: allgemeine Einschätzung der Trainer inkl. Entwicklung im Zeitraum, max. 100 Wörter, Perspektive "wir Trainer".${only('einschaetzung')}`);
+  }
+  if (sec.super.on) {
+    props.super = { type: 'array', items: { type: 'string' }, maxItems: sec.super.n };
+    rules.push(`- super: genau ${sec.super.n} kurze Stichpunkte zu den größten Stärken (weniger nur, wenn die Notizen nicht mehr hergeben).${only('super')}`);
+  }
+  if (sec.verbessern.on) {
+    props.verbessern = { type: 'array', items: { type: 'string' }, maxItems: sec.verbessern.n };
+    rules.push(`- verbessern: genau ${sec.verbessern.n} kurze Stichpunkte, positiv formuliert als nächste Schritte (weniger nur, wenn die Notizen nicht mehr hergeben).${only('verbessern')}`);
+  }
+  if (sec.stolz.on) {
+    props.stolz = {
+      type: 'array', maxItems: sec.stolz.n,
+      items: { type: 'object', properties: { titel: { type: 'string' }, text: { type: 'string' } }, required: ['titel', 'text'] },
+    };
+    rules.push(`- stolz: ${sec.stolz.n === 1 ? 'ein Themenblock' : `${sec.stolz.n} Themenblöcke`} "Darauf ${eltern ? 'kann Ihr Kind' : 'kannst du'} stolz sein" mit kurzem Titel und 1–2 Sätzen.${only('stolz')}`);
+  }
   const tool = {
     name: 'zusammenfassung',
-    description: 'Entwicklungsfeedback für ein Kind',
-    input_schema: {
-      type: 'object',
-      properties: {
-        einschaetzung: { type: 'string', description: 'max. 100 Wörter' },
-        super: { type: 'array', items: { type: 'string' }, maxItems: 5 },
-        verbessern: { type: 'array', items: { type: 'string' }, maxItems: 5 },
-        stolz: {
-          type: 'array', minItems: 1, maxItems: 2,
-          items: { type: 'object', properties: { titel: { type: 'string' }, text: { type: 'string' } }, required: ['titel', 'text'] },
-        },
-      },
-      required: ['einschaetzung', 'super', 'verbessern', 'stolz'],
-    },
+    description: 'Entwicklungsfeedback aus Trainer-Notizen',
+    input_schema: { type: 'object', properties: props, required: Object.keys(props) },
   };
-  const system = `Du schreibst ein Entwicklungsfeedback für ein Kind (9–11 Jahre) aus einer Jugendfußball-Mannschaft.
-Sprich das Kind direkt mit "du" an, ermutigend, ehrlich und konkret, in einfacher Sprache. Keine Namen nennen.
+  const who = eltern
+    ? 'Du schreibst ein Entwicklungsfeedback für die Eltern eines Kindes (9–11 Jahre) aus einer Jugendfußball-Mannschaft.\nSprich die Eltern mit "Sie" an und schreibe über das Kind als "Ihr Kind", sachlich und verständlich. Keine Namen nennen.'
+    : 'Du schreibst ein Entwicklungsfeedback für ein Kind (9–11 Jahre) aus einer Jugendfußball-Mannschaft.\nSprich das Kind direkt mit "du" an, ehrlich und konkret, in einfacher Sprache. Keine Namen nennen.';
+  const system = `${who}
+Tonlage: ${TONES[opts.tone] || TONES.ermutigend}.
 Das Kind heißt im Material ${code}. Andere Codes sind Mitspieler – nicht erwähnen.
-Grundlage sind ausschließlich die Trainer-Notizen; nichts erfinden.
+Grundlage sind ausschließlich die Trainer-Notizen; nichts erfinden. Keine Übungen oder Trainingstipps vorschlagen.
 Niveau (1–5) = Stand im Altersvergleich (3 = altersgemäß); Bewertung = Tendenz/Entwicklung. Berücksichtige beides: auch große Fortschritte auf niedrigem Niveau würdigen, bei hohem Niveau Kritik als nächsten Schritt einordnen.
-- einschaetzung: allgemeine Einschätzung der Trainer inkl. Entwicklung im Zeitraum, max. 100 Wörter, Perspektive "wir Trainer".
-- super: max. 5 kurze Stichpunkte "Das machst du schon super".
-- verbessern: max. 5 kurze Stichpunkte, positiv formuliert als nächste Schritte.
-- stolz: 1–2 Themenblöcke "Darauf kannst du stolz sein" mit kurzem Titel und 1–2 Sätzen.`;
-  const user = `Zeitraum: ${period}\nNotizen (Datum | Anlass | Bereich/Skill | Bewertung | Niveau | Kommentar):\n${lines.join('\n')}`;
+Als Schwerpunkt genannte Themen deutlich stärker berücksichtigen. Hinweise des Trainers befolgen, solange sie diesen Regeln nicht widersprechen.
+${recentFrom && opts.recency ? `Notizen ab ${recentFrom} gelten als aktuell. ${RECENCY[opts.recency]}\n` : ''}${rules.join('\n')}`;
+  return { system, tool };
+}
+
+/**
+ * Zusammenfassung schreiben. user = vollständige (anonymisierte, ggf. in der Vorschau bearbeitete) Nachricht.
+ * @returns {Promise<object>} Felder je eingeschaltetem Abschnitt
+ */
+export async function summarize({ code, user, opts, recentFrom }) {
+  const { system, tool } = summaryRequest({ code, opts, recentFrom });
   return callTool({ model: settings.modelSummary, system, user, tool, maxTokens: 4000 });
 }

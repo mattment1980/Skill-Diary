@@ -204,3 +204,33 @@ label.check { display: flex; gap: 10px; align-items: center; color: var(--muted)
 .setup p { margin: 0; }
 .file-btn { position: relative; text-align: center; }
 .file-btn input { position: absolute; inset: 0; opacity: 0; }
+
+/* Zusammenfassung: Optionen */
+.sum-opts { display: flex; flex-direction: column; gap: 8px; }
+.sum-opts > summary { display: flex; flex-direction: column; gap: 2px; cursor: pointer; list-style: none; }
+.sum-opts > summary::-webkit-details-marker { display: none; }
+.sum-opts > summary b::before { content: '▸ '; color: var(--muted); }
+.sum-opts[open] > summary b::before { content: '▾ '; }
+.sum-opts > summary small { color: var(--muted); }
+.sum-opts h4 { margin: 12px 0 4px; font: 600 .95rem 'Barlow', sans-serif; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip.small { padding: 6px 12px; font-size: .9rem; }
+.sum-sec { border: 1px solid var(--line); border-radius: 12px; padding: 8px 10px; display: flex; flex-direction: column; gap: 8px; }
+.sum-sec.off { opacity: .6; }
+.sum-sec-head { display: flex; align-items: center; gap: 8px; }
+.sum-sec-head input { width: 20px; height: 20px; accent-color: var(--green); }
+.sum-sec-head b { flex: 1; }
+.sum-sec-head select.count { width: auto; padding: 4px 8px; }
+.range-row { display: flex; align-items: center; gap: 10px; }
+.range-row input { flex: 1; accent-color: var(--green); }
+.range-row span { min-width: 9em; font-size: .9rem; }
+.topics { display: flex; flex-direction: column; gap: 6px; }
+.topic { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.topic.aus .topic-name { text-decoration: line-through; color: var(--muted); }
+.topic.fokus .topic-name { color: var(--green-hi); font-weight: 600; }
+.topic-name small { color: var(--muted); font-weight: 400; }
+.chips.seg3 { gap: 0; flex-wrap: nowrap; }
+.chips.seg3 .chip { border-radius: 0; padding: 5px 9px; font-size: .8rem; }
+.chips.seg3 .chip:first-child { border-radius: 999px 0 0 999px; }
+.chips.seg3 .chip:last-child { border-radius: 0 999px 999px 0; }
+.btn.small { padding: 8px 12px; font-size: .9rem; align-self: flex-start; }

@@ -35,3 +35,22 @@ test('Formatierung Zeitraum und Datum', () => {
   assert.equal(shortPeriod('2026-11-01', '2027-02-10'), 'Nov 2026 – Feb 2027');
   assert.equal(fmtDate('2026-10-24'), '24.10.2026');
 });
+
+test('Themenvorschläge: Anzahl, Stärke/Baustelle, Fortschritt', async () => {
+  const { suggestTopics } = await import('../js/core/stats.js');
+  const r = (Skill, Datum, Bewertung) => ({ Skill, Bereich: 'Technik', Datum, Bewertung });
+  const t = suggestTopics([
+    r('Passen', '2026-08-01', 'Kritisch'), r('Passen', '2026-08-10', 'Kritisch'),
+    r('Passen', '2026-09-20', 'Positiv'), r('Passen', '2026-10-01', 'Positiv'),
+    r('Schuss', '2026-08-01', 'Positiv'), r('Schuss', '2026-09-01', 'Positiv'),
+    r('Kopfball', '2026-09-01', 'Kritisch'), { Skill: '', Bewertung: 'Positiv' },
+  ]);
+  assert.deepEqual(t.map(x => [x.skill, x.n, x.kind]), [['Passen', 4, 'Fortschritt'], ['Schuss', 2, 'Stärke'], ['Kopfball', 1, 'Baustelle']]);
+});
+
+test('aktueller Abschnitt je nach Gewichtung', async () => {
+  const { recentFrom } = await import('../js/core/stats.js');
+  assert.equal(recentFrom('2026-07-01', '2026-10-01', 0), '');
+  assert.equal(recentFrom('2026-07-01', '2026-10-01', 1), '2026-08-31');
+  assert.equal(recentFrom('2026-07-01', '2026-10-01', 3), '2026-09-08');
+});

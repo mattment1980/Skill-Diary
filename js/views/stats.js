@@ -1,9 +1,9 @@
 // Ansicht „Auswertung“: Übersicht je Spieler, Diagramme, Einträge bearbeiten/löschen,
 // KI-Zusammenfassung und PowerPoint-Export.
-import { CONFIG, settings, today } from '../core/config.js';
+import { CONFIG, settings, today, saveSettings, SUMMARY_SECTIONS, SUMMARY_DEFAULTS, summaryOptions } from '../core/config.js';
 import { S, activePlayers, areas, skillsOf, areaOfSkill, inStatsRange } from '../core/state.js';
 import { fmtDate, shortPeriod } from '../core/format.js';
-import { ratingCounts } from '../core/stats.js';
+import { ratingCounts, suggestTopics, recentFrom } from '../core/stats.js';
 import { loadFeedback } from '../core/data.js';
 import * as od from '../services/onedrive.js';
 import { anonymize } from '../services/anon.js';
@@ -53,7 +53,7 @@ export function statsView() {
     radar(all, st.player),
     skillBars(all),
     timeline(list, st.area),
-    S.summary ? summaryEditor() : h('button', { class: 'btn primary block', disabled: !all.length, onclick: () => makeSummary(all) }, 'Zusammenfassung erstellen'),
+    ...(S.summary ? [summaryEditor()] : summaryStart(all)),
     h('h3', { class: 'list-title' }, st.skill || st.area || 'Alle Einträge', ` (${list.length})`, (st.skill || st.area) ? h('button', { class: 'mini clear', onclick: () => { st.skill = ''; st.area = ''; render(); } }, '✕ Filter') : null),
     ...list.map(f => (S.editId === f.ID ? editCard() : h('div', { class: `card fb r-${String(f.Bewertung).toLowerCase()}` },
       h('div', { class: 'fb-head' },
@@ -120,11 +120,92 @@ function overview() {
         ratingBar(rows));
     }));
 }
-async function makeSummary(rows) {
-  const player = S.cfg.players.find(p => p.name === S.stats.player);
+/* ---------- Zusammenfassung: Optionen ---------- */
+const TONE_LABELS = [['ermutigend', 'Ermutigend'], ['ausgewogen', 'Ausgewogen'], ['klar', 'Klar & fordernd']];
+const RECENCY_LABELS = ['Ganzer Zeitraum gleich', 'Aktuelles etwas stärker', 'Aktuelles deutlich stärker', 'Vor allem aktueller Stand'];
+const WEIGHTS = [['aus', 'Auslassen'], ['', 'Normal'], ['fokus', 'Schwerpunkt']];
+
+/** Spielerbezogene Optionen (Themen-Gewichte, Hinweise) – nur im Arbeitsspeicher, je Spieler neu. */
+function playerOpts() {
+  if (S.sumPlayer?.player !== S.stats.player) S.sumPlayer = { player: S.stats.player, weights: {}, extra: '', open: S.sumPlayer?.open || false };
+  return S.sumPlayer;
+}
+const storeOpts = o => saveSettings({ summary: o });
+
+/** Knopfreihe; options als [Wert, Beschriftung]. */
+const chips = (value, options, onpick, cls = '') => h('div', { class: `chips ${cls}` }, ...options.map(([v, l]) =>
+  h('button', { class: `chip small ${value === v ? 'on' : ''}`, onclick: () => onpick(v) }, l)));
+
+/** Optionen-Karte + Start-Knopf (solange noch keine Zusammenfassung da ist). */
+function summaryStart(all) {
+  const o = summaryOptions(), p = playerOpts();
+  const set = fn => { fn(o); storeOpts(o); render(); };
+  const topics = suggestTopics(all);
+  const used = all.filter(f => p.weights[f.Skill] !== 'aus');
+  const onSecs = SUMMARY_SECTIONS.filter(x => o.sections[x.key].on);
+  const changed = JSON.stringify(o) !== JSON.stringify(SUMMARY_DEFAULTS);
+  const brief = [o.audience === 'eltern' ? 'für Eltern' : 'für das Kind', TONE_LABELS.find(t => t[0] === o.tone)?.[1],
+    `${onSecs.length}/4 Abschnitte`, Object.values(p.weights).some(Boolean) ? 'Themen gewichtet' : '', p.extra.trim() ? 'mit Hinweisen' : '']
+    .filter(Boolean).join(' · ');
+
+  const section = x => {
+    const c = o.sections[x.key];
+    return h('div', { class: `sum-sec ${c.on ? '' : 'off'}` },
+      h('label', { class: 'sum-sec-head' },
+        h('input', { type: 'checkbox', checked: c.on, onchange: e => set(q => { q.sections[x.key].on = e.target.checked; }) }),
+        h('b', {}, x.label),
+        c.on && x.max ? h('select', { class: 'count', 'aria-label': 'Anzahl Punkte', onchange: e => set(q => { q.sections[x.key].n = +e.target.value; }) },
+          ...Array.from({ length: x.max }, (_, i) => h('option', { value: i + 1, selected: c.n === i + 1 }, `${i + 1} ${x.key === 'stolz' ? (i ? 'Blöcke' : 'Block') : (i ? 'Punkte' : 'Punkt')}`))) : null),
+      c.on ? h('div', { class: 'chips' },
+        h('button', { class: `chip small ${c.areas.length ? '' : 'on'}`, onclick: () => set(q => { q.sections[x.key].areas = []; }) }, 'Alle Bereiche'),
+        ...areas().map(a => h('button', {
+          class: `chip small ${c.areas.includes(a) ? 'on' : ''}`,
+          onclick: () => set(q => { const l = q.sections[x.key].areas; q.sections[x.key].areas = l.includes(a) ? l.filter(y => y !== a) : [...l, a]; }),
+        }, a))) : null);
+  };
+
+  const panel = h('details', { class: 'card sum-opts', open: p.open, ontoggle: e => { p.open = e.target.open; } },
+    h('summary', {}, h('b', {}, 'Optionen'), h('small', {}, brief)),
+    h('h4', {}, 'Für wen'), chips(o.audience, [['kind', 'Kind'], ['eltern', 'Eltern']], v => set(q => { q.audience = v; })),
+    h('h4', {}, 'Tonlage'), chips(o.tone, TONE_LABELS, v => set(q => { q.tone = v; })),
+    h('h4', {}, 'Zeitliche Gewichtung'),
+    h('div', { class: 'range-row' },
+      h('input', { type: 'range', min: 0, max: 3, step: 1, value: o.recency,
+        oninput: e => { e.target.nextSibling.textContent = RECENCY_LABELS[e.target.value]; },
+        onchange: e => set(q => { q.recency = +e.target.value; }) }),
+      h('span', {}, RECENCY_LABELS[o.recency])),
+    o.recency ? h('p', { class: 'hint' }, `Aktuell = ab ${fmtDate(recentFrom(S.stats.from, S.stats.to, o.recency))}`) : null,
+    h('h4', {}, 'Abschnitte'),
+    ...SUMMARY_SECTIONS.map(section),
+    h('h4', {}, 'Themen'), h('p', { class: 'hint' }, `${used.length} von ${all.length} Notizen gehen an die KI`),
+    topics.length ? h('div', { class: 'topics' }, ...topics.map(t => h('div', { class: `topic ${p.weights[t.skill] || 'normal'}` },
+      h('span', { class: 'topic-name' }, t.skill, h('small', {}, ` ${t.n} · ${t.kind}`)),
+      chips(p.weights[t.skill] || '', WEIGHTS, v => { p.weights[t.skill] = v; render(); }, 'seg3')))) : h('p', { class: 'hint' }, 'Keine Themen im Zeitraum.'),
+    h('h4', {}, 'Hinweise an die KI'),
+    h('textarea', { rows: 3, value: p.extra, placeholder: 'z. B. „Er war 4 Wochen verletzt – das bitte nicht als Rückschritt werten.“',
+      oninput: e => { p.extra = e.target.value; } }),
+    h('p', { class: 'hint' }, 'Wird wie die Notizen anonymisiert und in der Vorschau angezeigt; nicht gespeichert.'),
+    changed ? h('button', { class: 'btn ghost small', onclick: () => { storeOpts(null); render(); } }, 'Optionen zurücksetzen') : null);
+
+  return [panel, h('button', { class: 'btn primary block', disabled: !used.length || !onSecs.length, onclick: () => makeSummary(used, topics, o, p) }, 'Zusammenfassung erstellen')];
+}
+
+async function makeSummary(rows, topics, opts, p) {
+  const player = S.cfg.players.find(x => x.name === S.stats.player);
   const code = 'P-ICH';
+  const st = S.stats;
+  const period = `${fmtDate(st.from)} – ${fmtDate(st.to)}`;
+  const recent = recentFrom(st.from, st.to, opts.recency);
+  const focus = topics.filter(t => p.weights[t.skill] === 'fokus').map(t => t.skill);
   const lines = [...rows].reverse().map(f => `${fmtDate(f.Datum)} | ${[f.Art, f.Anlass].filter(Boolean).join(' ') || '–'} | ${f.Bereich}/${f.Skill} | ${f.Bewertung} | ${Number(f.Niveau) || '–'} | ${String(f.Kommentar).replace(/\n/g, ' ')}`);
-  const anon = await anonymize(lines.join('\n'), S.cfg.players,
+  const msg = [
+    `Zeitraum: ${period}`,
+    focus.length ? `Schwerpunkte: ${focus.join(', ')}` : '',
+    p.extra.trim() ? `Hinweise des Trainers: ${p.extra.trim().replace(/\n+/g, ' ')}` : '',
+    'Notizen (Datum | Anlass | Bereich/Skill | Bewertung | Niveau | Kommentar):',
+    ...lines,
+  ].filter(Boolean).join('\n');
+  const anon = await anonymize(msg, S.cfg.players,
     async (_t, cands) => (cands.includes(player) ? player : null), { player, code });
   let text = anon.text.replace(/P-(?!ICH)[A-Z2-9]{3}/g, 'ein Mitspieler');
   if (settings.previewBeforeSend) {
@@ -132,38 +213,53 @@ async function makeSummary(rows) {
     if (text == null) return;
   }
   await withBusy('Zusammenfassung wird geschrieben …', async () => {
-    const period = `${fmtDate(S.stats.from)} – ${fmtDate(S.stats.to)}`;
-    const r = await summarize({ code, lines: text.split('\n'), period });
-    S.summary = { period, ...r };
+    const r = await summarize({ code, user: text, opts, recentFrom: recent ? fmtDate(recent) : '' });
+    const on = Object.fromEntries(SUMMARY_SECTIONS.map(x => [x.key, opts.sections[x.key].on]));
+    S.summary = {
+      period, audience: opts.audience, on,
+      einschaetzung: on.einschaetzung ? String(r.einschaetzung || '') : '',
+      super: on.super ? (r.super || []).slice(0, opts.sections.super.n) : [],
+      verbessern: on.verbessern ? (r.verbessern || []).slice(0, opts.sections.verbessern.n) : [],
+      stolz: on.stolz ? (r.stolz || []).slice(0, opts.sections.stolz.n) : [],
+    };
   });
+}
+
+/** Überschriften je Zielgruppe (Bildschirm und PowerPoint). */
+const ELTERN_TITLES = { verbessern: 'Nächste Entwicklungsschritte', stolz: 'Darauf kann Ihr Kind stolz sein' };
+function sectionTitles(audience) {
+  return { ...Object.fromEntries(SUMMARY_SECTIONS.map(x => [x.key, x.label])), ...(audience === 'eltern' ? ELTERN_TITLES : {}) };
 }
 
 function summaryEditor() {
   const s = S.summary;
+  const T = sectionTitles(s.audience);
   const words = t => (t.trim().match(/\S+/g) || []).length;
   const listArea = (key, max) => h('textarea', {
-    rows: 5, value: s[key].join('\n'),
+    rows: Math.max(3, s[key].length + 1), value: s[key].join('\n'),
     oninput: e => { s[key] = e.target.value.split('\n').map(x => x.trim()).filter(Boolean).slice(0, max); },
   });
   const counter = h('small', { class: 'counter' }, `${words(s.einschaetzung)}/100 Wörter`);
   return h('div', { class: 'card summary' },
-    h('h3', {}, 'Unsere Einschätzung ', counter),
-    h('textarea', { rows: 6, value: s.einschaetzung, oninput: e => { s.einschaetzung = e.target.value; counter.textContent = `${words(e.target.value)}/100 Wörter`; } }),
-    h('h3', {}, 'Das machst du schon super'), h('small', { class: 'hint' }, 'Ein Punkt pro Zeile, max. 5'), listArea('super', 5),
-    h('h3', {}, 'Hier kannst du dich noch verbessern'), listArea('verbessern', 5),
-    h('h3', {}, 'Darauf kannst du stolz sein'),
-    ...s.stolz.map(b => h('div', { class: 'stolz' },
-      h('input', { type: 'text', value: b.titel, oninput: e => { b.titel = e.target.value; } }),
-      h('textarea', { rows: 3, value: b.text, oninput: e => { b.text = e.target.value; } }))),
+    s.on.einschaetzung ? [
+      h('h3', {}, T.einschaetzung, ' ', counter),
+      h('textarea', { rows: 6, value: s.einschaetzung, oninput: e => { s.einschaetzung = e.target.value; counter.textContent = `${words(e.target.value)}/100 Wörter`; } })] : null,
+    s.on.super ? [h('h3', {}, T.super), h('small', { class: 'hint' }, 'Ein Punkt pro Zeile, max. 5'), listArea('super', 5)] : null,
+    s.on.verbessern ? [h('h3', {}, T.verbessern), listArea('verbessern', 5)] : null,
+    s.on.stolz ? [h('h3', {}, T.stolz),
+      ...s.stolz.map(b => h('div', { class: 'stolz' },
+        h('input', { type: 'text', value: b.titel, oninput: e => { b.titel = e.target.value; } }),
+        h('textarea', { rows: 3, value: b.text, oninput: e => { b.text = e.target.value; } })))] : null,
     h('div', { class: 'actions' },
       h('button', { class: 'btn ghost', onclick: () => { S.summary = null; render(); } }, 'Verwerfen'),
       h('button', { class: 'btn primary', onclick: exportPptx }, 'PowerPoint exportieren')));
 }
+
 async function exportPptx() {
   const name = S.stats.player, st = S.stats;
   await withBusy('Erstelle PowerPoint …', async () => {
     const blob = await buildPptx({
-      name, period: shortPeriod(st.from, st.to), from: st.from, to: st.to, summary: S.summary,
+      name, period: shortPeriod(st.from, st.to), from: st.from, to: st.to, summary: S.summary, titles: S.summary.audience === 'eltern' ? ELTERN_TITLES : {},
       rows: S.feedback.filter(f => f.Spieler === name && inStatsRange(f)),
       teamRows: S.feedback.filter(inStatsRange),
       areas: areas(), skills: S.cfg.skills,

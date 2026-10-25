@@ -64,6 +64,26 @@ function replaceList(doc, key, items, gap = false) {
   if (items.length) p.parentNode.removeChild(p); else t.textContent = '';
 }
 
+/**
+ * Abschnitt der Seite 1 anpassen: Überschrift setzen bzw. – wenn abgeschaltet – Inhalt, Überschrift
+ * und Hintergrundkasten entfernen. Erwartete Reihenfolge in der Vorlage: Kasten, Überschrift, Inhalt.
+ */
+function sectionShapes(doc, key, title, on) {
+  const t = texts(doc).find(x => x.textContent.includes(`{{${key}}}`));
+  let content = t;
+  while (content && !(content.localName === 'sp' && content.namespaceURI === NS_P)) content = content.parentNode;
+  if (!content) return;
+  const prevSp = el => { let e = el.previousElementSibling; while (e && e.localName !== 'sp') e = e.previousElementSibling; return e; };
+  const head = prevSp(content), box = head && prevSp(head);
+  const isBox = box && !box.getElementsByTagNameNS(NS_A, 't').length;
+  if (on) {
+    const ht = head && head.getElementsByTagNameNS(NS_A, 't');
+    if (ht?.length && title) { ht[0].textContent = `${title}:`; [...ht].slice(1).forEach(x => { x.textContent = ''; }); }
+    return;
+  }
+  for (const el of [content, head, isBox ? box : null]) el?.parentNode.removeChild(el);
+}
+
 function picsByName(doc) {
   const out = {};
   for (const pic of doc.getElementsByTagNameNS(NS_P, 'pic')) {
@@ -76,10 +96,10 @@ function picsByName(doc) {
 
 /**
  * Erzeugt die PPTX.
- * @param {object} p {name, period, from, to, summary, rows (Spieler, Zeitraum), teamRows, areas, skills}
+ * @param {object} p {name, period, from, to, summary (mit on je Abschnitt), titles (abweichende Überschriften je Abschnitt), rows (Spieler, Zeitraum), teamRows, areas, skills}
  * @returns {Promise<Blob>}
  */
-export async function buildPptx({ name, period, from, to, summary, rows, teamRows, areas, skills }) {
+export async function buildPptx({ name, period, from, to, summary, titles = {}, rows, teamRows, areas, skills }) {
   const JSZip = await loadJSZip();
   try { await Promise.all([document.fonts.load('500 20px Barlow'), document.fonts.load('700 20px Barlow')]); } catch { /* Ersatzschrift */ }
   const zip = await JSZip.loadAsync(await (await fetch(TEMPLATE)).arrayBuffer());
@@ -89,6 +109,11 @@ export async function buildPptx({ name, period, from, to, summary, rows, teamRow
 
   // Seite 1
   const s1 = parse(await zip.file('ppt/slides/slide1.xml').async('string'));
+  // Abschnitte: abgeschaltete entfernen; Überschriften nur ändern, wenn abweichend vorgegeben (z. B. für Eltern)
+  const on = summary.on || {};
+  for (const [key, ph] of [['einschaetzung', 'EINSCHAETZUNG'], ['super', 'SUPER'], ['verbessern', 'VERBESSERN'], ['stolz', 'STOLZ']]) {
+    if (on[key] === false || titles[key]) sectionShapes(s1, ph, titles[key], on[key] !== false);
+  }
   replaceSimple(s1, {
     ZEITRAUM: period, SPIELER: name, EINSCHAETZUNG: summary.einschaetzung,
     ...Object.fromEntries([0, 1, 2, 3].map(i => [`B${i + 1}`, four[i] ? kidLabel(four[i]) : ''])),

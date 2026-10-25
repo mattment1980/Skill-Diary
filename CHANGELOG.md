@@ -1,5 +1,16 @@
 # Changelog
 
+## 27 – 25.10.2026 (Optionen der Zusammenfassung)
+- Einklappbare „Optionen“ über „Zusammenfassung erstellen“:
+  - Für wen: Kind (Standard, du-Form) oder Eltern (Sie-Form, „Ihr Kind“; angepasste Überschriften auch in der PowerPoint)
+  - Tonlage: ermutigend · ausgewogen · klar & fordernd
+  - Zeitliche Gewichtung (Schieberegler): von „ganzer Zeitraum gleich“ bis „vor allem aktueller Stand“
+  - Je Abschnitt an/aus, Bereiche (z. B. „Verbessern“ nur Technik) und Anzahl Punkte; abgeschaltete Abschnitte fehlen auch in der PowerPoint
+  - Themen aus den Notizen (je Skill, mit Einordnung Stärke/Baustelle/Fortschritt): auslassen · normal · Schwerpunkt; ausgelassene Notizen gehen nicht an die KI
+  - Hinweise an die KI (Freitext), wird mitanonymisiert und in der Vorschau angezeigt
+- Allgemeine Optionen werden gemerkt; Themen-Gewichte und Hinweise nur bis zum Spielerwechsel (nicht gespeichert)
+- Vorschau zeigt jetzt die komplette Nachricht an die KI; keine Übungsvorschläge
+
 ## 26 – 24.10.2026 (Aufräumen)
 - `core/data.js` ohne Oberflächenaufrufe; Datenbank-Import aus dem Rahmen in `core/data.js` verlagert
 - PowerPoint-Export aufgeteilt in `export/charts.js` (Grafiken) und `export/report.js` (Vorlage befüllen)

@@ -43,3 +43,38 @@ export function avgLevel(rows) {
 
 /** Anzahl je Bewertung. */
 export const ratingCounts = rows => CONFIG.ratings.map(r => rows.filter(f => f.Bewertung === r).length);
+
+const SCORE = { Positiv: 1, Neutral: 0, Kritisch: -1 };
+const mean = a => a.reduce((x, y) => x + y, 0) / a.length;
+
+/**
+ * Themenvorschläge für die Zusammenfassung: je Skill Anzahl und grobe Einordnung.
+ * kind: 'Fortschritt' | 'nachgelassen' (Tendenz 1. vs. 2. Hälfte, ab 4 Einträgen),
+ *       sonst 'Stärke' | 'Baustelle' | 'gemischt'. Sortiert nach Anzahl.
+ * @returns {{skill:string, area:string, n:number, kind:string}[]}
+ */
+export function suggestTopics(rows) {
+  const by = new Map();
+  for (const f of rows) {
+    if (!f.Skill) continue;
+    if (!by.has(f.Skill)) by.set(f.Skill, { skill: f.Skill, area: f.Bereich || '', rows: [] });
+    by.get(f.Skill).rows.push(f);
+  }
+  return [...by.values()].map(({ skill, area, rows: r }) => {
+    const s = [...r].sort((a, b) => String(a.Datum).localeCompare(String(b.Datum))).map(f => SCORE[f.Bewertung] ?? 0);
+    const half = Math.floor(s.length / 2);
+    const delta = s.length >= 4 ? mean(s.slice(s.length - half)) - mean(s.slice(0, half)) : 0;
+    const avg = mean(s);
+    const kind = delta >= 0.5 ? 'Fortschritt' : delta <= -0.5 ? 'nachgelassen'
+      : avg >= 0.5 ? 'Stärke' : avg <= -0.3 ? 'Baustelle' : 'gemischt';
+    return { skill, area, n: r.length, kind };
+  }).sort((a, b) => b.n - a.n || a.skill.localeCompare(b.skill));
+}
+
+/** Datum, ab dem Notizen als „aktuell“ gelten: letztes Drittel (bzw. letzte Hälfte bei stärkster Gewichtung) des Zeitraums. */
+export function recentFrom(from, to, recency) {
+  if (!recency) return '';
+  const a = dayNum(from), b = dayNum(to);
+  const d = new Date(Math.round(b - (b - a) * (recency >= 3 ? 1 / 4 : 1 / 3)) * 86400000);
+  return d.toISOString().slice(0, 10);
+}
