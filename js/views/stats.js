@@ -13,6 +13,9 @@ import { h, toast, confirmSend, withBusy, render, select, levelPicker } from '..
 import { radar, skillBars, timeline } from '../ui/charts.js';
 
 let loading = false;
+/** Wo ein Eintrag gerade bearbeitet wird ('list' | 'notes'), damit das Formular nur an einer Stelle erscheint. */
+let editIn = 'list';
+const startEdit = (f, where) => { S.editId = f.ID; S.edit = { ...f }; editIn = where; render(); };
 /** Feedback (neu) laden; Fehler als Meldung, danach neu zeichnen. */
 function reload() {
   if (loading) return;
@@ -60,10 +63,10 @@ export function statsView() {
     ...(S.summary ? [summaryEditor()] : summaryStart(scored)),
     notes.length ? notesCard(notes) : null,
     h('h3', { class: 'list-title' }, st.skill || st.area || 'Alle Einträge', ` (${list.length})`, (st.skill || st.area) ? h('button', { class: 'mini clear', onclick: () => { st.skill = ''; st.area = ''; render(); } }, '✕ Filter') : null),
-    ...list.map(f => (S.editId === f.ID ? editCard() : h('div', { class: `card fb r-${String(f.Bewertung).toLowerCase()}` },
+    ...list.map(f => (S.editId === f.ID && editIn === 'list' ? editCard() : h('div', { class: `card fb r-${String(f.Bewertung).toLowerCase()}` },
       h('div', { class: 'fb-head' },
         h('div', { class: 'fb-meta' }, `${fmtDate(f.Datum)} · ${[f.Art, f.Anlass].filter(Boolean).join(' ') || '–'}${f.Position ? ' · ' + f.Position : ''}`),
-        h('button', { class: 'mini', 'aria-label': 'Bearbeiten', onclick: () => { S.editId = f.ID; S.edit = { ...f }; render(); } }, '✎'),
+        h('button', { class: 'mini', 'aria-label': 'Bearbeiten', onclick: () => startEdit(f, 'list') }, '✎'),
         h('button', { class: 'mini', 'aria-label': 'Löschen', onclick: () => removeFeedback(f) }, '✕')),
       h('div', { class: 'fb-skill' }, f.Skill, h('span', { class: 'tags' }, Number(f.Niveau) ? h('span', { class: `tag lvl-tag l${f.Niveau}` }, `Niveau ${f.Niveau}`) : null, h('span', { class: 'tag' }, f.Bewertung))),
       h('div', {}, f.Kommentar)))));
@@ -117,7 +120,7 @@ async function saveEdit() {
 }
 
 async function removeFeedback(f) {
-  if (!confirm(`Diesen Eintrag wirklich löschen?\n\n${f.Skill}: ${String(f.Kommentar).slice(0, 80)}`)) return;
+  if (!confirm(`Diesen ${isNote(f) ? 'Kommentar' : 'Eintrag'} wirklich löschen?\n\n${isNote(f) ? '' : f.Skill + ': '}${String(f.Kommentar).slice(0, 80)}`)) return;
   await withBusy('Lösche …', async () => {
     await od.deleteFeedback(f.ID);
     S.feedback = S.feedback.filter(x => x.ID !== f.ID);
@@ -247,9 +250,12 @@ function notesCard(notes) {
   return h('div', { class: 'card notes' },
     h('h3', {}, 'Kommentare / Sonstiges', h('small', {}, ` ${notes.length}`)),
     h('p', { class: 'hint' }, 'Notizbuch des Trainers – geht nicht an die KI und nicht in die PowerPoint.'),
-    ...notes.map(f => h('div', { class: 'note-item' },
-      h('div', { class: 'fb-meta' }, `${fmtDate(f.Datum)} · ${[f.Art, f.Anlass].filter(Boolean).join(' ') || '–'}`),
-      h('div', {}, f.Kommentar))));
+    ...notes.map(f => (S.editId === f.ID && editIn === 'notes' ? editCard() : h('div', { class: 'note-item' },
+      h('div', { class: 'fb-head' },
+        h('div', { class: 'fb-meta' }, `${fmtDate(f.Datum)} · ${[f.Art, f.Anlass].filter(Boolean).join(' ') || '–'}`),
+        h('button', { class: 'mini', 'aria-label': 'Bearbeiten', onclick: () => startEdit(f, 'notes') }, '✎'),
+        h('button', { class: 'mini', 'aria-label': 'Löschen', onclick: () => removeFeedback(f) }, '✕')),
+      h('div', {}, f.Kommentar)))));
 }
 
 /** Überschriften je Zielgruppe (Bildschirm und PowerPoint). */

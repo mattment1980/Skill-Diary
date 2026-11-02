@@ -1,5 +1,8 @@
 # Changelog
 
+## 29 – 02.11.2026
+- Block „Kommentare / Sonstiges“: Kommentare direkt dort bearbeiten (✎) und löschen (✕)
+
 ## 28 – 02.11.2026 (Kommentare ohne Wertung)
 - Neue Wahl „Kommentar“ neben Positiv/Neutral/Kritisch (Prüfen und Bearbeiten): reine Notiz des Trainers ohne Wertung.
   Gespeichert mit Bereich/Skill/Bewertung = „Kommentar“ und Niveau = „n/a“.
