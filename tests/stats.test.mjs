@@ -54,3 +54,17 @@ test('aktueller Abschnitt je nach Gewichtung', async () => {
   assert.equal(recentFrom('2026-07-01', '2026-10-01', 1), '2026-08-31');
   assert.equal(recentFrom('2026-07-01', '2026-10-01', 3), '2026-09-08');
 });
+
+test('Kommentare ohne Wertung zählen in keine Berechnung', async () => {
+  const { isNote, rated, suggestTopics } = await import('../js/core/stats.js');
+  const rows = [
+    { Datum: '2026-10-01', Bereich: 'Technik', Skill: 'Passen', Bewertung: 'Positiv', Niveau: 4 },
+    { Datum: '2026-10-02', Bereich: 'Kommentar', Skill: 'Kommentar', Bewertung: 'Kommentar', Niveau: 'n/a' },
+  ];
+  assert.deepEqual(rows.map(isNote), [false, true]);
+  assert.equal(rated(rows).length, 1);
+  assert.deepEqual(avgLevel(rows), { val: 4, n: 1 });
+  assert.deepEqual(ratingCounts(rated(rows)), [1, 0, 0]);
+  assert.equal(bucketize(rated(rows), '2026-10-01', '2026-10-24').buckets.reduce((s, b) => s + b.total, 0), 1);
+  assert.deepEqual(suggestTopics(rated(rows)).map(t => t.skill), ['Passen']);
+});

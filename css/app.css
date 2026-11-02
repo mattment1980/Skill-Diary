@@ -12,6 +12,7 @@
   --pos: #2fbf71;
   --neu: #8a968f;
   --krit: #f28c28;
+  --note: #6ea8fe;
   --radius: 16px;
   --tabs-h: 64px;
 }
@@ -75,8 +76,10 @@ label.check { display: flex; gap: 10px; align-items: center; color: var(--muted)
 .chip.r-positiv.on { background: var(--pos); border-color: var(--pos); color: #06150d; }
 .chip.r-neutral.on { background: var(--neu); border-color: var(--neu); color: #0d110f; }
 .chip.r-kritisch.on { background: var(--krit); border-color: var(--krit); color: #1a1006; }
-.rating { display: flex; gap: 8px; }
+.chip.r-kommentar.on { background: var(--note); border-color: var(--note); color: #06101d; }
+.rating { display: flex; flex-wrap: wrap; gap: 8px; }
 .rating .chip { flex: 1; }
+.rating .chip.r-kommentar { flex-basis: 100%; padding-top: 7px; padding-bottom: 7px; font-weight: 500; border-style: dashed; }
 .actions { display: flex; gap: 10px; }
 .actions .btn { flex: 1; }
 .actions.sticky { position: sticky; bottom: calc(var(--tabs-h) + env(safe-area-inset-bottom)); padding: 16px 0 10px; background: linear-gradient(transparent, var(--bg) 35%); z-index: 2; }
@@ -97,7 +100,7 @@ label.check { display: flex; gap: 10px; align-items: center; color: var(--muted)
 .totals { display: flex; gap: 8px; }
 .total { flex: 1; text-align: center; border-radius: 12px; padding: 8px; background: var(--surface-2); color: var(--muted); font-size: .85rem; }
 .total b { display: block; font-size: 1.6rem; color: var(--text); font-family: 'Barlow Condensed', sans-serif; }
-.total.r-positiv b { color: var(--pos); } .total.r-kritisch b { color: var(--krit); }
+.total.r-positiv b { color: var(--pos); } .total.r-kritisch b { color: var(--krit); } .total.r-kommentar b { color: var(--note); }
 .area-row { display: flex; flex-direction: column; gap: 6px; background: transparent; border: 0; border-radius: 10px; padding: 6px; color: var(--text); text-align: left; font: inherit; }
 .area-row.on { background: var(--surface-2); }
 .area-name small { color: var(--muted); }
@@ -107,6 +110,9 @@ label.check { display: flex; gap: 10px; align-items: center; color: var(--muted)
 .list-title { margin-top: 8px; }
 .fb { gap: 4px; border-left: 4px solid var(--neu); }
 .fb.r-positiv { border-left-color: var(--pos); } .fb.r-kritisch { border-left-color: var(--krit); }
+.fb.r-kommentar { border-left-color: var(--note); border-left-style: dashed; }
+.notes { gap: 8px; border-left: 4px dashed var(--note); }
+.notes .note-item { padding-top: 6px; border-top: 1px solid var(--surface-2); }
 .fb-meta { color: var(--muted); font-size: .85rem; }
 .fb-skill { font-weight: 600; display: flex; justify-content: space-between; gap: 8px; }
 .tag { font-size: .75rem; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 1px 8px; }

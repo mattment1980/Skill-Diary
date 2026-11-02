@@ -1,5 +1,5 @@
 // Ansicht „Erfassen“: Kontext, Notiz (Text oder Diktat), KI-Zuordnung bzw. manuelle Erfassung.
-import { today, settings } from '../core/config.js';
+import { CONFIG, today, settings } from '../core/config.js';
 import { S, saveDraft, activePlayers, areas, skillsOf, areaOfSkill, displayName, emptyEntry } from '../core/state.js';
 import { anonymize, deanonymize } from '../services/anon.js';
 import { extractFeedback } from '../services/ai.js';
@@ -106,6 +106,11 @@ async function runAI() {
     const r = await extractFeedback({ text, codes, skills: S.cfg.skills, positions: S.cfg.positions, dateStr: `${today()} (${new Date().toLocaleDateString('de-DE', { weekday: 'long' })})` });
     const k = r.kontext || {};
     const entries = (r.eintraege || []).map(e => {
+      const N = CONFIG.note;
+      if (e.bewertung === N.rating) {
+        return emptyEntry({ player: codes.get(e.spieler) || null, rating: N.rating, area: N.area, skill: N.skill,
+          position: e.position || '', comment: deanonymize(e.kommentar, codes, displayName) });
+      }
       const skill = skillsOf(e.bereich).includes(e.skill) ? e.skill : (areaOfSkill(e.skill) ? e.skill : '');
       return emptyEntry({
         player: codes.get(e.spieler) || null,

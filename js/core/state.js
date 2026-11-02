@@ -38,5 +38,15 @@ export const displayName = p => {
 /** Neuer, leerer Eintrag für die Prüfansicht. */
 export const emptyEntry = (o = {}) => ({ id: uid(), player: null, area: '', skill: '', rating: '', level: 0, position: '', comment: '', ...o });
 
+/** Bewertung eines Eintrags der Prüfansicht setzen; „Kommentar“ setzt Bereich/Skill fest und entfernt das Niveau. */
+export function setEntryRating(e, r) {
+  const N = CONFIG.note;
+  if (r === N.rating) Object.assign(e, { rating: r, area: N.area, skill: N.skill, level: 0 });
+  else {
+    if (e.rating === N.rating) Object.assign(e, { area: '', skill: '' });
+    e.rating = r;
+  }
+}
+
 /** Filter: Eintrag liegt im gewählten Auswertungszeitraum (Einträge ohne Datum zählen mit). */
 export const inStatsRange = f => !f.Datum || (f.Datum >= S.stats.from && f.Datum <= S.stats.to);

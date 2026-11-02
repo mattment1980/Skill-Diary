@@ -77,7 +77,7 @@ export async function extractFeedback({ text, codes, skills, positions, dateStr 
               spieler: { type: 'string', description: 'Spieler-Code, z. B. P-K7Q' },
               bereich: { type: 'string', enum: [...areas, ''] },
               skill: { type: 'string', enum: [...skills.map(s => s.skill), ''] },
-              bewertung: { type: 'string', enum: ['Positiv', 'Neutral', 'Kritisch'] },
+              bewertung: { type: 'string', enum: ['Positiv', 'Neutral', 'Kritisch', 'Kommentar'] },
               position: { type: 'string', enum: [...positions.map(p => p.code), ''] },
               niveau: { type: 'integer', minimum: 1, maximum: 5, description: 'Leistungsniveau im Altersvergleich' },
               kommentar: { type: 'string' },
@@ -95,6 +95,7 @@ Regeln:
 - Ein Eintrag je Spieler und Skill. Betrifft eine Aussage zwei Skills, erzeuge zwei Einträge.
 - Bereich und Skill nur aus dem Katalog. Ist der Skill nicht eindeutig, lass skill leer (bereich wenn möglich setzen).
 - Bewertung: Positiv = Lob/Fortschritt, Kritisch = Defizit/Arbeitsauftrag, Neutral = beschreibend oder gemischt.
+- Kommentar = reine Notiz des Trainers ohne Leistungsbewertung und ohne Bezug zu einem Skill (z. B. Organisatorisches, Absprachen, Umfeld). Dann bereich und skill leer, niveau 3. Nur verwenden, wenn wirklich keine Leistung bewertet wird.
 - Kommentar: Aussage des Trainers knapp und sachlich auf Deutsch, nah an seiner Formulierung, Codes statt Namen.
 - Niveau 1–5 = gezeigtes Leistungsniveau im Vergleich zum altersgemäß Erwartbaren (U10/U11): 1 weit darunter, 2 darunter, 3 altersgemäß, 4 darüber, 5 weit darüber. Unabhängig von der Bewertung: Lob für Fortschritt kann auf Niveau 2 liegen, Kritik bei einem starken Spieler auf Niveau 4. Ohne klare Hinweise 3.
 - Position nur, wenn genannt (Verteidiger links=LV, rechts=RV, Mittelfeld links/zentral/rechts=LM/ZM/RM, Sturm=ST, Tor=TW).

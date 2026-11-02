@@ -35,6 +35,11 @@ export function bucketize(rows, from, to) {
   return { weekly, buckets, undated: rows.length - dated.length };
 }
 
+/** Eintrag ist ein reiner Trainer-Kommentar (ohne Wertung). */
+export const isNote = f => f.Bewertung === CONFIG.note.rating;
+/** Nur bewertete Einträge – Grundlage aller Berechnungen, Diagramme, Zusammenfassung und Exporte. */
+export const rated = rows => rows.filter(f => !isNote(f));
+
 /** Durchschnittsniveau einer Gruppe von Einträgen; null, wenn kein Niveau erfasst. */
 export function avgLevel(rows) {
   const v = rows.map(f => Number(f.Niveau)).filter(n => n >= 1 && n <= 5);

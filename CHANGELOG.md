@@ -1,5 +1,14 @@
 # Changelog
 
+## 28 – 02.11.2026 (Kommentare ohne Wertung)
+- Neue Wahl „Kommentar“ neben Positiv/Neutral/Kritisch (Prüfen und Bearbeiten): reine Notiz des Trainers ohne Wertung.
+  Gespeichert mit Bereich/Skill/Bewertung = „Kommentar“ und Niveau = „n/a“.
+- Kommentare zählen in keine Berechnung (Summen, Durchschnittsniveau, Spinnendiagramm, Verlauf, Themen) und gehen
+  nicht an die KI der Zusammenfassung.
+- In der Auswertung eigener Block „Kommentare / Sonstiges“ (nur zur Ansicht); in der Eintragsliste blau gestrichelt.
+- PowerPoint unverändert: Kommentare fließen nicht ein.
+- KI-Zuordnung kann „Kommentar“ vorschlagen, wenn eine Aussage keine Leistung bewertet (z. B. Organisatorisches).
+
 ## 27 – 25.10.2026 (Optionen der Zusammenfassung)
 - Einklappbare „Optionen“ über „Zusammenfassung erstellen“:
   - Für wen: Kind (Standard, du-Form) oder Eltern (Sie-Form, „Ihr Kind“; angepasste Überschriften auch in der PowerPoint)

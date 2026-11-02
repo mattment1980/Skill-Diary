@@ -61,6 +61,10 @@ neu gezeichnet wird über `render()` aus `ui/dom.js`, das `ui/shell.js` beim Sta
 | Sprachmodell | Cache `transformers-cache` | wird bei Updates nicht gelöscht |
 | App-Dateien | Cache `sd-v<Version>` | Service Worker |
 
+**Kommentare ohne Wertung:** Einträge mit Bewertung `Kommentar` (`CONFIG.note`) sind reine Trainer-Notizen.
+Alle Berechnungen, die Zusammenfassung und der Export arbeiten nur mit `rated()` aus `core/stats.js`;
+Kommentare erscheinen nur in der Eintragsliste und im Block „Kommentare / Sonstiges“.
+
 **Excel-Schema:** Spalten der Tabelle `Feedback` stehen in `CONFIG.feedbackColumns`
 (`js/core/config.js`). Neue Spalten **hinten anhängen** – `migrateFeedbackColumns()` ergänzt sie in
 bestehenden Dateien automatisch, ältere vorgemerkte Zeilen werden aufgefüllt.

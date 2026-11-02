@@ -3,7 +3,7 @@
 import { CONFIG, settings, today, saveSettings, SUMMARY_SECTIONS, SUMMARY_DEFAULTS, summaryOptions } from '../core/config.js';
 import { S, activePlayers, areas, skillsOf, areaOfSkill, inStatsRange } from '../core/state.js';
 import { fmtDate, shortPeriod } from '../core/format.js';
-import { ratingCounts, suggestTopics, recentFrom } from '../core/stats.js';
+import { ratingCounts, suggestTopics, recentFrom, isNote, rated } from '../core/stats.js';
 import { loadFeedback } from '../core/data.js';
 import * as od from '../services/onedrive.js';
 import { anonymize } from '../services/anon.js';
@@ -41,19 +41,24 @@ export function statsView() {
   const all = S.feedback.filter(f => f.Spieler === st.player && inStatsRange(f))
     .sort((a, b) => String(b.Datum).localeCompare(String(a.Datum)));
   const list = st.skill ? all.filter(f => f.Skill === st.skill) : st.area ? all.filter(f => f.Bereich === st.area) : all;
+  // Kommentare (ohne Wertung) nur in der Liste und im Block „Kommentare / Sonstiges“ – nie in Berechnungen.
+  const scored = rated(all), notes = all.filter(isNote);
+  const N = CONFIG.note;
 
   return h('section', { class: 'view stats' }, head,
     h('div', { class: 'card' },
-      h('div', { class: 'totals' }, ...CONFIG.ratings.map(r => h('div', { class: `total r-${r.toLowerCase()}` }, h('b', {}, ratingCounts(all)[CONFIG.ratings.indexOf(r)]), r))),
+      h('div', { class: 'totals' }, ...CONFIG.ratings.map(r => h('div', { class: `total r-${r.toLowerCase()}` }, h('b', {}, ratingCounts(scored)[CONFIG.ratings.indexOf(r)]), r)),
+        notes.length ? h('div', { class: 'total r-kommentar' }, h('b', {}, notes.length), N.rating) : null),
       ...areas().map(a => {
         const rows = all.filter(f => f.Bereich === a);
         return h('button', { class: `area-row ${st.area === a ? 'on' : ''}`, onclick: () => { st.area = st.area === a ? '' : a; st.skill = ''; render(); } },
           h('span', { class: 'area-name' }, a, h('small', {}, ` ${rows.length}`)), ratingBar(rows));
       })),
-    radar(all, st.player),
-    skillBars(all),
-    timeline(list, st.area),
-    ...(S.summary ? [summaryEditor()] : summaryStart(all)),
+    radar(scored, st.player),
+    skillBars(scored),
+    timeline(rated(list), st.area),
+    ...(S.summary ? [summaryEditor()] : summaryStart(scored)),
+    notes.length ? notesCard(notes) : null,
     h('h3', { class: 'list-title' }, st.skill || st.area || 'Alle Einträge', ` (${list.length})`, (st.skill || st.area) ? h('button', { class: 'mini clear', onclick: () => { st.skill = ''; st.area = ''; render(); } }, '✕ Filter') : null),
     ...list.map(f => (S.editId === f.ID ? editCard() : h('div', { class: `card fb r-${String(f.Bewertung).toLowerCase()}` },
       h('div', { class: 'fb-head' },
@@ -66,19 +71,29 @@ export function statsView() {
 
 /** Bearbeitungsansicht eines gespeicherten Eintrags in der Auswertung. */
 function editCard() {
-  const e = S.edit;
+  const e = S.edit, N = CONFIG.note;
+  const note = e.Bewertung === N.rating;
+  const setRating = r => {
+    if (r === N.rating) Object.assign(e, { Bewertung: r, Bereich: N.area, Skill: N.skill, Niveau: N.level });
+    else {
+      if (note) Object.assign(e, { Bereich: '', Skill: '', Niveau: '' });
+      e.Bewertung = r;
+    }
+    render();
+  };
   return h('div', { class: 'card entry' },
     h('div', { class: 'row' },
       h('input', { type: 'date', value: e.Datum || '', onchange: ev => { e.Datum = ev.target.value; } }),
       ...['Spiel', 'Training'].map(v => h('button', { class: `chip ${e.Art === v ? 'on' : ''}`, onclick: () => { e.Art = e.Art === v ? '' : v; render(); } }, v))),
     h('input', { type: 'text', placeholder: 'Anlass / Gegner', value: e.Anlass || '', oninput: ev => { e.Anlass = ev.target.value; } }),
-    h('div', { class: 'rating' }, ...CONFIG.ratings.map(r => h('button', {
-      class: `chip r-${r.toLowerCase()} ${e.Bewertung === r ? 'on' : ''}`, onclick: () => { e.Bewertung = r; render(); },
+    h('div', { class: 'rating' }, ...[...CONFIG.ratings, N.rating].map(r => h('button', {
+      class: `chip r-${r.toLowerCase()} ${e.Bewertung === r ? 'on' : ''}`, onclick: () => setRating(r),
     }, r))),
-    levelPicker(Number(e.Niveau) || 0, n => { e.Niveau = n; render(); }),
-    h('div', { class: 'row' },
-      select(e.Bereich, areas(), v => { e.Bereich = v; if (!skillsOf(v).includes(e.Skill)) e.Skill = ''; render(); }, 'Bereich'),
-      select(e.Skill, skillsOf(e.Bereich).length ? skillsOf(e.Bereich) : S.cfg.skills.map(s => s.skill), v => { e.Skill = v; e.Bereich = areaOfSkill(v); render(); }, 'Skill')),
+    note ? h('p', { class: 'hint' }, 'Nur Notiz für dich – ohne Wertung, zählt nicht in die Auswertung und geht nicht in die PowerPoint.')
+      : [levelPicker(Number(e.Niveau) || 0, n => { e.Niveau = n; render(); }),
+        h('div', { class: 'row' },
+          select(e.Bereich, areas(), v => { e.Bereich = v; if (!skillsOf(v).includes(e.Skill)) e.Skill = ''; render(); }, 'Bereich'),
+          select(e.Skill, skillsOf(e.Bereich).length ? skillsOf(e.Bereich) : S.cfg.skills.map(s => s.skill), v => { e.Skill = v; e.Bereich = areaOfSkill(v); render(); }, 'Skill'))],
     select(e.Position || '', S.cfg.positions.map(p => [p.code, `${p.code} – ${p.label || p.group}`]), v => { e.Position = v; }, 'Position (optional)', true),
     h('textarea', { rows: 4, value: e.Kommentar, oninput: ev => { e.Kommentar = ev.target.value; } }),
     h('div', { class: 'actions' },
@@ -89,7 +104,9 @@ function editCard() {
 async function saveEdit() {
   const e = S.edit;
   if (!e.Skill || !e.Bewertung || !String(e.Kommentar).trim()) return toast('Skill, Bewertung und Kommentar ausfüllen.', 'error');
-  const patch = { Datum: e.Datum || '', Art: e.Art || '', Anlass: e.Anlass || '', Bereich: e.Bereich, Skill: e.Skill, Niveau: Number(e.Niveau) || '',
+  const note = isNote(e);
+  const patch = { Datum: e.Datum || '', Art: e.Art || '', Anlass: e.Anlass || '', Bereich: e.Bereich, Skill: e.Skill,
+    Niveau: note ? CONFIG.note.level : Number(e.Niveau) || '',
     Bewertung: e.Bewertung, Position: e.Position || '', Kommentar: String(e.Kommentar).trim() };
   await withBusy('Speichere Änderung …', async () => {
     await od.updateFeedback(e.ID, patch);
@@ -117,7 +134,7 @@ function overview() {
       const rows = by[p.name] || [];
       return h('button', { class: 'area-row', onclick: () => { S.stats.player = p.name; render(); } },
         h('span', { class: 'area-name' }, p.name, h('small', {}, ` ${rows.length}`)),
-        ratingBar(rows));
+        ratingBar(rated(rows)));
     }));
 }
 /* ---------- Zusammenfassung: Optionen ---------- */
@@ -225,6 +242,16 @@ async function makeSummary(rows, topics, opts, p) {
   });
 }
 
+/** Block „Kommentare / Sonstiges“: Trainer-Notizen ohne Wertung – nur zur Ansicht, nicht an die KI, nicht in die PowerPoint. */
+function notesCard(notes) {
+  return h('div', { class: 'card notes' },
+    h('h3', {}, 'Kommentare / Sonstiges', h('small', {}, ` ${notes.length}`)),
+    h('p', { class: 'hint' }, 'Notizbuch des Trainers – geht nicht an die KI und nicht in die PowerPoint.'),
+    ...notes.map(f => h('div', { class: 'note-item' },
+      h('div', { class: 'fb-meta' }, `${fmtDate(f.Datum)} · ${[f.Art, f.Anlass].filter(Boolean).join(' ') || '–'}`),
+      h('div', {}, f.Kommentar))));
+}
+
 /** Überschriften je Zielgruppe (Bildschirm und PowerPoint). */
 const ELTERN_TITLES = { verbessern: 'Nächste Entwicklungsschritte', stolz: 'Darauf kann Ihr Kind stolz sein' };
 function sectionTitles(audience) {
@@ -260,8 +287,8 @@ async function exportPptx() {
   await withBusy('Erstelle PowerPoint …', async () => {
     const blob = await buildPptx({
       name, period: shortPeriod(st.from, st.to), from: st.from, to: st.to, summary: S.summary, titles: S.summary.audience === 'eltern' ? ELTERN_TITLES : {},
-      rows: S.feedback.filter(f => f.Spieler === name && inStatsRange(f)),
-      teamRows: S.feedback.filter(inStatsRange),
+      rows: rated(S.feedback.filter(f => f.Spieler === name && inStatsRange(f))),
+      teamRows: rated(S.feedback.filter(inStatsRange)),
       areas: areas(), skills: S.cfg.skills,
     });
     const file = `${name} - Entwicklungsgespräch ${today()}.pptx`;

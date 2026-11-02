@@ -13,6 +13,9 @@ export const CONFIG = {
     'Skill', 'Bewertung', 'Kommentar', 'Quelle', 'Gruppe', 'VideoLink', 'Niveau'],
   levels: { 1: 'weit unter altersgemäß', 2: 'unter altersgemäß', 3: 'altersgemäß', 4: 'über altersgemäß', 5: 'weit über altersgemäß' },
   ratings: ['Positiv', 'Neutral', 'Kritisch'],
+  // Reiner Trainer-Kommentar ohne Wertung („Notizbuch“): zählt in keine Auswertung, geht weder an die KI
+  // der Zusammenfassung noch in die PowerPoint. Steht so in den Spalten Bereich, Skill, Bewertung, Niveau.
+  note: { area: 'Kommentar', skill: 'Kommentar', rating: 'Kommentar', level: 'n/a' },
   seasonStart: '2026-07-01',
 };
 

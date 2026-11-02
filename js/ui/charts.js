@@ -3,7 +3,7 @@
 import { CONFIG } from '../core/config.js';
 import { S, areas, skillsOf, inStatsRange } from '../core/state.js';
 import { firstName } from '../core/format.js';
-import { bucketize, avgLevel } from '../core/stats.js';
+import { bucketize, avgLevel, rated } from '../core/stats.js';
 import { h, render, esc } from './dom.js';
 
 const fmt1 = v => v.toFixed(1).replace('.', ',');
@@ -38,7 +38,7 @@ export function skillBars(rows) {
 export function radar(rows, playerName) {
   const A = areas();
   const me = A.map(a => avgLevel(rows.filter(f => f.Bereich === a)));
-  const teamRows = S.feedback.filter(inStatsRange);
+  const teamRows = rated(S.feedback.filter(inStatsRange));
   const team = A.map(a => avgLevel(teamRows.filter(f => f.Bereich === a)));
   const card = (...k) => h('div', { class: 'card' }, h('h3', {}, 'Niveau je Bereich'), ...k);
   if (!me.some(Boolean)) return card(h('p', { class: 'hint' }, 'Noch keine Einträge mit Niveau im Zeitraum. Das Niveau wird bei jedem neuen Eintrag erfasst und lässt sich bei alten Einträgen über ✎ nachtragen.'));
